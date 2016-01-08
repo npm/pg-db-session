@@ -4,7 +4,6 @@ const DOMAIN_TO_SESSION = new WeakMap()
 const Promise = require('bluebird')
 const domain = require('domain')
 
-const AtomicSessionConnectionPair = require('./lib/atomic-session-connpair.js')
 const TxSessionConnectionPair = require('./lib/tx-session-connpair.js')
 const SessionConnectionPair = require('./lib/session-connpair.js')
 
@@ -43,16 +42,13 @@ const api = module.exports = {
   },
 
   getConnection () {
-    return DOMAIN_TO_SESSION.get(process.domain).getConnection()
+    return api.session.getConnection()
   },
 
   get session () {
     var current = DOMAIN_TO_SESSION.get(process.domain)
-    if (!current || !process.domain) {
+    if (!current || current.inactive || !process.domain) {
       throw new NoSessionAvailable()
-    }
-    while (current.inactive && current.parent) {
-      current = current.parent
     }
     return current
   },
@@ -93,15 +89,20 @@ class Session {
 
   transaction (operation, args) {
     const getConnPair = this.getConnection()
-    const getResult = Session$RunWrapped(this, connPair => {
-      return new TransactionSession(this, connPair)
+    const getResult = Session$RunWrapped(connPair => {
+      return new TransactionSession(connPair)
     }, getConnPair, `BEGIN`, {
       success: `COMMIT`,
       failure: `ROLLBACK`
     }, operation, args)
-    const releasePair = getResult.return(getConnPair).then(
-      pair => pair.release()
-    )
+
+    const releasePair = getConnPair.then(pair => {
+      return getResult.reflect().then(result => {
+        return result.isFulfilled()
+          ? pair.release()
+          : pair.release(result.reason())
+      })
+    })
 
     return releasePair.return(getResult)
   }
@@ -119,8 +120,7 @@ class Session {
 }
 
 class TransactionSession {
-  constructor (parent, connPair) {
-    this.parent = parent
+  constructor (connPair) {
     this.connectionPair = connPair
     this.inactive = false
     this.operation = Promise.resolve(true)
@@ -128,9 +128,11 @@ class TransactionSession {
 
   getConnection () {
     if (this.inactive) {
-      return this.parent.getConnection()
+      return new Promise((_, reject) => {
+        reject(new NoSessionAvailable())
+      })
     }
-    // XXX(chrisdickinson): creating a TxConnPair implicitly
+    // NB(chrisdickinson): creating a TxConnPair implicitly
     // swaps out "this.operation", creating a linked list of
     // promises.
     return new TxSessionConnectionPair(this).onready
@@ -138,78 +140,87 @@ class TransactionSession {
 
   transaction (operation, args) {
     if (this.inactive) {
-      return this.parent.transaction(operation, args)
+      return new Promise((_, reject) => {
+        reject(new NoSessionAvailable())
+      })
     }
     return operation.apply(null, args)
   }
 
   atomic (operation, args) {
-    const atomicConnPair = new AtomicSessionConnectionPair(this)
+    const atomicConnPair = this.getConnection()
     const savepointName = getSavepointName(operation)
-    const getResult = Session$RunWrapped(this, connPair => {
-      return new AtomicSession(this, connPair, savepointName)
-    }, atomicConnPair.onready, `SAVEPOINT ${savepointName}`, {
+    const getResult = Session$RunWrapped(connPair => {
+      return new AtomicSession(connPair, savepointName)
+    }, atomicConnPair, `SAVEPOINT ${savepointName}`, {
       success: `RELEASE SAVEPOINT ${savepointName}`,
       failure: `ROLLBACK TO SAVEPOINT ${savepointName}`
     }, operation, args)
 
-    return getResult.then(() => {
-      setImmediate(() => {
-        atomicConnPair.close()
+    const releasePair = atomicConnPair.then(pair => {
+      return getResult.reflect().then(result => {
+        return result.isFulfilled()
+          ? pair.release()
+          : pair.release(result.reason())
       })
-    }).return(getResult)
+    })
+
+    return releasePair.return(getResult)
   }
 }
 
 class AtomicSession extends TransactionSession {
-  constructor (parent, connection, name) {
-    super(parent, connection)
+  constructor (connection, name) {
+    super(connection)
     this.name = name
   }
 }
 
-function Session$RunWrapped (parent,
-                             createSession,
-                             getConnPair, before, after, operation, args) {
-  const createSubdomain = getConnPair.then(connPair => {
+function Session$RunWrapped (createSession,
+                             getConnPair,
+                             before,
+                             after,
+                             operation,
+                             args) {
+  return getConnPair.then(pair => {
     const subdomain = domain.create()
-    const session = createSession(connPair)
+    const session = createSession(pair)
     DOMAIN_TO_SESSION.set(subdomain, session)
-    return subdomain
-  })
 
-  const runBefore = getConnPair.then(connPair => new Promise(
-    (resolve, reject) => connPair.connection.query(
-      before,
-      err => err ? reject(err) : resolve()
-    )
-  ))
-
-  const getResult = runBefore.return(
-    createSubdomain
-  ).then(domain => {
-    args.unshift(operation)
-    return Promise.resolve(domain.run.apply(domain, args))
-  })
-
-  const getReflectedResult = getResult.reflect()
-  const runCommitStep = Promise.join(
-    getReflectedResult,
-    getConnPair.get('connection')
-  ).spread((result, connection) => {
-    return new Promise((resolve, reject) => {
-      connection.query(
-        result.isFulfilled()
-          ? after.success
-          : after.failure,
+    const runBefore = new Promise((resolve, reject) => {
+      return pair.connection.query(
+        before,
         err => err ? reject(err) : resolve()
       )
     })
-  })
 
-  return runCommitStep.return(
-    createSubdomain
-  ).then(markInactive(parent)).return(getResult)
+    return runBefore.then(() => {
+      const opArgs = args.slice()
+      opArgs.unshift(operation)
+      const getResult = Promise.resolve(
+        subdomain.run.apply(subdomain, opArgs)
+      )
+
+      const waitOperation = Promise.join(
+        getResult,
+        getResult.then(() => session.operation)
+      )
+      .finally(markInactive(subdomain))
+      .return(getResult.reflect())
+
+      const runCommitStep = waitOperation.then(result => {
+        return new Promise((resolve, reject) => {
+          return pair.connection.query(
+            result.isFulfilled()
+              ? after.success
+              : after.failure,
+            err => err ? reject(err) : resolve()
+          )
+        })
+      })
+      return runCommitStep.return(getResult)
+    })
+  })
 }
 
 function getSavepointName (operation) {
@@ -221,14 +232,11 @@ function getSavepointName (operation) {
 }
 getSavepointName.ID = 0
 
-function markInactive (session) {
-  return domain => {
-    domain.exit()
-    DOMAIN_TO_SESSION.get(domain).inactive = true
-
-    // if, somehow, we get a reference to this domain again, point
-    // it at the parent session.
-    DOMAIN_TO_SESSION.set(domain, session)
+function markInactive (subdomain) {
+  return () => {
+    subdomain.exit()
+    DOMAIN_TO_SESSION.get(subdomain).inactive = true
+    DOMAIN_TO_SESSION.set(subdomain, null)
   }
 }
 

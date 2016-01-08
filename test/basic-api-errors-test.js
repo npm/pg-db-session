@@ -28,10 +28,66 @@ test('test atomic outside of session', assert => {
     .catch(err => assert.end(err))
 })
 
-if (false)
-test('test atomic after release', assert => {
+test('test getConnection after release', assert => {
+  const domain1 = domain.create()
+
+  db.install(domain1, getConnection, {maxConcurrency: 0})
+  
+  domain1.run(() => {
+    return db.transaction(() => {
+      const session = db.session
+      setImmediate(err => {
+        session.getConnection()
+          .then(pair => { throw new Error('should not reach here') })
+          .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
+          .catch(err => assert.fail(err))
+          .finally(assert.end)
+      })
+      return
+    })()
+  })
+  .catch(err => assert.fail(err))
+  .finally(() => domain1.exit())
+
+  function getConnection () {
+    return {
+      connection: {query (sql, ready) {
+        return ready()
+      }},
+      release (err) {
+      }
+    }
+  }
 })
 
-if (false)
 test('test transaction after release', assert => {
+  const domain1 = domain.create()
+
+  db.install(domain1, getConnection, {maxConcurrency: 0})
+  
+  domain1.run(() => {
+    return db.transaction(() => {
+      const session = db.session
+      setImmediate(err => {
+        session.transaction(() => {})
+          .then(pair => { throw new Error('should not reach here') })
+          .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
+          .catch(err => assert.fail(err))
+          .finally(assert.end)
+      })
+      return
+    })()
+  })
+  .catch(err => assert.fail(err))
+  .finally(() => domain1.exit())
+
+  function getConnection () {
+    return {
+      connection: {query (sql, ready) {
+        return ready()
+      }},
+      release (err) {
+      }
+    }
+  }
 })

@@ -45,7 +45,6 @@ test('test nested transaction order', assert => {
     return runOperations(txRunSubOperation)
   }).then(() => {
     assert.equal(process.domain, undefined)
-    domain1.exit()
   }).then(() => {
     assert.equal(LOGS.join('\n'), `
 BEGIN
@@ -73,8 +72,10 @@ COMMIT
 release
 `.trim())
     assert.equal(process.domain, undefined)
-  }).then(() => assert.end())
-    .catch(assert.end)
+  })
+  .catch(err => assert.fail(err.stack))
+  .finally(() => domain1.exit())
+  .finally(assert.end)
 })
 
 test('test nested atomic transaction order', assert => {
@@ -85,7 +86,6 @@ test('test nested atomic transaction order', assert => {
     return runOperations(atomicRunSubOperation)
   }).then(() => {
     assert.equal(process.domain, undefined)
-    domain1.exit()
   }).then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
 BEGIN
@@ -117,8 +117,10 @@ COMMIT
 release
 `.trim())
     assert.equal(process.domain, undefined)
-  }).then(() => assert.end())
-    .catch(assert.end)
+  })
+  .catch(err => assert.fail(err.stack))
+  .finally(() => domain1.exit())
+  .finally(assert.end)
 })
 
 function innerGetConnection () {
