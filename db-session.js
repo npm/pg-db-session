@@ -195,18 +195,20 @@ function Session$RunWrapped (createSession,
     })
 
     return runBefore.then(() => {
-      const opArgs = args.slice()
-      opArgs.unshift(operation)
       const getResult = Promise.resolve(
-        subdomain.run.apply(subdomain, opArgs)
+        subdomain.run(() => Promise.try(() => {
+          return operation.apply(null, args)
+        }))
       )
 
+      const reflectedResult = getResult.reflect()
+
       const waitOperation = Promise.join(
-        getResult,
-        getResult.then(() => session.operation)
+        reflectedResult,
+        reflectedResult.then(() => session.operation)
       )
       .finally(markInactive(subdomain))
-      .return(getResult.reflect())
+      .return(reflectedResult)
 
       const runCommitStep = waitOperation.then(result => {
         return new Promise((resolve, reject) => {
