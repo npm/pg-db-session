@@ -118,53 +118,47 @@ test('test error in COMMIT', assert => {
     }
   }
 })
-return
-test('test error in ROLLBACK', assert => {
-  const domain1 = domain.create()
 
-  db.install(domain1, () => new Promise((_, reject) => {
-    reject(new TestError('cannot connect'))
-  }), {maxConcurrency: 0})
-  
+test('test error in ROLLBACK: does not reuse connection', assert => {
+  const domain1 = domain.create()
+  class RollbackError extends Error {}
+
+  db.install(domain1, getConnection, {maxConcurrency: 1})
+
+  var connectionPair = null
   domain1.run(() => {
-    return db.transaction(() => {
-      assert.fail('should not reach here.')
-    })()
+    const first = db.transaction(() => {
+      return db.getConnection().then(pair => {
+        connectionPair = pair.pair
+        pair.release()
+        throw new Error('any kind of error, really')
+      })
+    })().reflect()
+
+    const second = db.getConnection().then(pair => {
+      // with concurrency=1, we will try to re-use
+      // the connection if we can. since we had an error,
+      // it's best not to use the connection!
+      assert.notEqual(connectionPair, pair)
+      pair.release()
+    })
+
+    return Promise.join(first, second)
   })
   .catch(err => assert.fail(err))
   .finally(() => domain1.exit())
   .finally(assert.end)
-})
 
-// what happens when getConnection fails before BEGIN
-test('test getConnection error', assert => {
-  const domain1 = domain.create()
-
-  db.install(domain1, () => new Promise((_, reject) => {
-    reject(new TestError('cannot connect'))
-  }), {maxConcurrency: 0})
-  
-  domain1.run(() => {
-    return db.transaction(() => {
-      assert.fail('should not reach here.')
-    })()
-  })
-  .catch(err => assert.fail(err))
-  .finally(() => domain1.exit())
-  .finally(assert.end)
-})
-
-function innerGetConnection () {
-  return {
-    connection: {query (sql, ready) {
-      if (shouldErrorToggle) {
-        var err = shouldErrorToggle
-        shouldErrorToggle = false
-        return ready(err)
+  function getConnection () {
+    return {
+      connection: {query (sql, ready) {
+        if (sql === 'ROLLBACK') {
+          return ready(new RollbackError('failed ROLLBACK'))
+        }
+        return ready()
+      }},
+      release (err) {
       }
-      return ready()
-    }},
-    release (err) {
     }
   }
-}
+})
