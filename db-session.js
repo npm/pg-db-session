@@ -124,7 +124,6 @@ class TransactionSession {
     this.connectionPair = connPair
     this.inactive = false
     this.operation = Promise.resolve(true)
-    this.operation.redBalloon = true
   }
 
   getConnection () {
