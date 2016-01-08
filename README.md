@@ -3,7 +3,7 @@
 Abuse domains to get a form of continuation local storage. Associate all events
 originating from a single domain to a single database session, which manages
 maximum concurrency, transactions, and operation ordering for consumers of the
-database connection. *It is almost 3AM.*
+database connection.
 
 ```javascript
 const db = require('pg-db-session')
