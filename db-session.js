@@ -8,6 +8,13 @@ const AtomicSessionConnectionPair = require('./lib/atomic-session-connpair.js')
 const TxSessionConnectionPair = require('./lib/tx-session-connpair.js')
 const SessionConnectionPair = require('./lib/session-connpair.js')
 
+class NoSessionAvailable extends Error {
+  constructor () {
+    super('No session available')
+    Error.captureStackTrace(this, NoSessionAvailable)
+  }
+}
+
 const api = module.exports = {
   install (domain, getConnection, opts) {
     opts = opts || {}
@@ -19,15 +26,19 @@ const api = module.exports = {
 
   atomic (operation) {
     return function atomic$operation () {
-      const args = [].slice.call(arguments)
-      return api.session.atomic(operation, args)
+      return Promise.try(() => {
+        const args = [].slice.call(arguments)
+        return api.session.atomic(operation, args)
+      })
     }
   },
 
   transaction (operation) {
     return function transaction$operation () {
-      const args = [].slice.call(arguments)
-      return api.session.transaction(operation, args)
+      return Promise.try(() => {
+        const args = [].slice.call(arguments)
+        return api.session.transaction(operation, args)
+      })
     }
   },
 
@@ -37,14 +48,16 @@ const api = module.exports = {
 
   get session () {
     var current = DOMAIN_TO_SESSION.get(process.domain)
-    if (!current) {
-      throw new Error('no session active')
+    if (!current || !process.domain) {
+      throw new NoSessionAvailable()
     }
     while (current.inactive && current.parent) {
       current = current.parent
     }
     return current
-  }
+  },
+
+  NoSessionAvailable
 }
 
 // how does this nest:
@@ -70,7 +83,7 @@ class Session {
       return pending.promise
     }
 
-    const connPair = this._getConnection()
+    const connPair = Promise.resolve(this._getConnection())
     ++this._activeConnections
 
     return connPair.then(
@@ -210,12 +223,12 @@ function getSavepointName (operation) {
 getSavepointName.ID = 0
 
 function markInactive (session) {
-  // XXX(chrisdickinson): is this a good idea? this
-  // means that DB requests after the operation completes
-  // will still work, but will operate outside of the
-  // transaction.
   return domain => {
+    domain.exit()
     DOMAIN_TO_SESSION.get(domain).inactive = true
+
+    // if, somehow, we get a reference to this domain again, point
+    // it at the parent session.
     DOMAIN_TO_SESSION.set(domain, session)
   }
 }
