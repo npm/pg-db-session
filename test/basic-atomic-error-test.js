@@ -46,7 +46,7 @@ test('test error in previous query', assert => {
         }
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }
@@ -58,13 +58,13 @@ test('test error in BEGIN', assert => {
   class BeginError extends Error {}
 
   db.install(domain1, getConnection, {maxConcurrency: 0})
-  
+
   domain1.run(() => {
     return db.atomic(() => {
       assert.fail('should not reach here.')
     })()
   })
-  .catch(BeginError, err => assert.ok(1, 'caught expected err'))
+  .catch(BeginError, () => assert.ok(1, 'caught expected err'))
   .catch(err => assert.fail(err))
   .finally(() => domain1.exit())
   .finally(assert.end)
@@ -82,7 +82,7 @@ test('test error in BEGIN', assert => {
         }
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }
@@ -94,7 +94,7 @@ test('test error in COMMIT', assert => {
   class CommitError extends Error {}
 
   db.install(domain1, getConnection, {maxConcurrency: 0})
-  
+
   domain1.run(() => {
     return db.atomic(() => {
       return db.getConnection().then(pair => pair.release())
@@ -113,7 +113,7 @@ test('test error in COMMIT', assert => {
         }
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }
@@ -157,7 +157,7 @@ test('test error in ROLLBACK: does not reuse connection', assert => {
         }
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }

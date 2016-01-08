@@ -1,6 +1,5 @@
 'use strict'
 
-const Promise = require('bluebird')
 const domain = require('domain')
 const test = require('tap').test
 

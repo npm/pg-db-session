@@ -1,5 +1,5 @@
 'use strict'
-const Promise = require('bluebird')
+
 const domain = require('domain')
 const test = require('tap').test
 
@@ -12,7 +12,7 @@ test('rolling back transaction calls ROLLBACK', assert => {
 
   LOGS.length = 0
   db.install(domain1, getConnection, {maxConcurrency: 0})
-  
+
   domain1.run(() => {
     return db.transaction(() => {
       throw new Error('no thanks')
@@ -29,7 +29,7 @@ test('rolling back transaction calls ROLLBACK', assert => {
         LOGS.push(sql)
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }
@@ -40,7 +40,7 @@ test('rolling back atomic calls ROLLBACK', assert => {
 
   LOGS.length = 0
   db.install(domain1, getConnection, {maxConcurrency: 0})
-  
+
   domain1.run(() => {
     return db.atomic(() => {
       throw new Error('no thanks')
@@ -64,7 +64,7 @@ ROLLBACK
         LOGS.push(sql)
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }

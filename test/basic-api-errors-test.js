@@ -1,6 +1,5 @@
 'use strict'
 
-const Promise = require('bluebird')
 const domain = require('domain')
 const test = require('tap').test
 
@@ -32,11 +31,11 @@ test('test getConnection after release', assert => {
   const domain1 = domain.create()
 
   db.install(domain1, getConnection, {maxConcurrency: 0})
-  
+
   domain1.run(() => {
     return db.transaction(() => {
       const session = db.session
-      setImmediate(err => {
+      setImmediate(() => {
         session.getConnection()
           .then(pair => { throw new Error('should not reach here') })
           .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
@@ -54,7 +53,7 @@ test('test getConnection after release', assert => {
       connection: {query (sql, ready) {
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }
@@ -64,11 +63,11 @@ test('test transaction after release', assert => {
   const domain1 = domain.create()
 
   db.install(domain1, getConnection, {maxConcurrency: 0})
-  
+
   domain1.run(() => {
     return db.transaction(() => {
       const session = db.session
-      setImmediate(err => {
+      setImmediate(() => {
         session.transaction(() => {})
           .then(pair => { throw new Error('should not reach here') })
           .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
@@ -86,7 +85,7 @@ test('test transaction after release', assert => {
       connection: {query (sql, ready) {
         return ready()
       }},
-      release (err) {
+      release () {
       }
     }
   }
