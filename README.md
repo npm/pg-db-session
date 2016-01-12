@@ -77,7 +77,52 @@ it if the promise is rejected. Atomics may be nested.
 
 Install a database `Session` on the domain `d`.
 
-#### `ConnPairFn := Function → Promise({connection, release})`
+##### `Options`
+
+Sessions accept the following options:
+
+* `maxConcurrency`: An integer specifying the maximum number of connections a
+  given session will make at a time. `0` is treated as `Infinity`. Defaults to
+  `Infinity`. *Note:* this number is implicitly bound by the size of the `pg`
+  connection pool. For example, even if the limit is set at `200`, if `pg`'s
+  pool size is limited to `10`, the upper limit will effectively be `10`.
+* `onSessionIdle()`: A function that is called whenever all requests for
+  connections have been satisfied. Note that this may happen while connections
+  are still open.
+* `onConnectionRequest(baton)`: A function accepting a baton object that is
+  called when a request for a connection is made.
+* `onConnectionStart(baton)`: A function acccepting a baton object that is
+  called when a request for a connection is fulfilled. The baton will be the
+  same object that was passed to a previous call to `onConnectionRequest`,
+  suitable for associating timing information.
+* `onConnectionFinish(baton, err)`: A function accepting a baton object and
+  an optional `err` parameter that will be called when a connection is released
+  back to the session.
+* `onTransactionRequest(baton, operation, args)`: A function accepting a baton,
+  function, and array of arguments representing the request for a transaction
+  session. Called coincident with `onConnectionRequest`.
+* `onTransactionStart(baton, operation, args)`: A function accepting a baton,
+  function, and array of arguments representing the fulfillment of a request
+  for a transaction session. Called before `BEGIN`, coincident with
+  `onConnectionStart`.
+* `onTransactionFinish(baton, operation, args, PromiseInspection)`:
+  A function accepting a baton, function, array of arguments, and a
+  [`PromiseInspection`][bluebird-inspection] representing the state of the
+  transaction. Called coincident with `onConnectionFinish`.
+* `onAtomicRequest(baton, operation, args)`: A function accepting a baton,
+  function, and array of arguments representing the request for an atomic
+  session.
+* `onAtomicStart(baton, operation, args)`: A function accepting a baton,
+  function, and array of arguments representing the fulfillment of a request
+  for an atomic session.
+* `onAtomicFinish(baton, operation, args, PromiseInspection)`:
+  A function accepting a baton, function, array of arguments, and a
+  [`PromiseInspection`][bluebird-inspection] representing the state of the
+  atomic transaction.
+
+All functions will default to `noop` if not provided.
+
+##### `ConnPairFn := Function → Promise({connection, release})`
 
 A function that returns a `Promise` for an object with `connection` and `release`
 properties, corresponding to the `client` and `done` parameters handed back by

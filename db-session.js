@@ -14,12 +14,27 @@ class NoSessionAvailable extends Error {
   }
 }
 
+function noop () {
+}
+
 const api = module.exports = {
   install (domain, getConnection, opts) {
-    opts = opts || {}
+    opts = Object.assign({
+      maxConcurrency: Infinity,
+      onSessionIdle: noop,
+      onConnectionRequest: noop,
+      onConnectionStart: noop,
+      onConnectionFinish: noop,
+      onTransactionRequest: noop,
+      onTransactionStart: noop,
+      onTransactionFinish: noop,
+      onAtomicRequest: noop,
+      onAtomicStart: noop,
+      onAtomicFinish: noop
+    }, opts || {})
     DOMAIN_TO_SESSION.set(domain, new Session(
       getConnection,
-      opts.maxConcurrency
+      opts
     ))
   },
 
@@ -63,15 +78,29 @@ const api = module.exports = {
 // 3. atomic — grouped set of operations — parent transaction treats all connections performed
 //    as a single operation
 class Session {
-  constructor (getConnection, maxConcurrency) {
+  constructor (getConnection, opts) {
     this._getConnection = getConnection
-    this._activeConnections = 0
-    this._maxConcurrency = maxConcurrency || Infinity
+    this.activeConnections = 0
+    this.maxConcurrency = opts.maxConcurrency || Infinity
+    this.metrics = {
+      onSessionIdle: opts.onSessionIdle,
+      onConnectionRequest: opts.onConnectionRequest,
+      onConnectionStart: opts.onConnectionStart,
+      onConnectionFinish: opts.onConnectionFinish,
+      onTransactionRequest: opts.onTransactionRequest,
+      onTransactionStart: opts.onTransactionStart,
+      onTransactionFinish: opts.onTransactionFinish,
+      onAtomicRequest: opts.onAtomicRequest,
+      onAtomicStart: opts.onAtomicStart,
+      onAtomicFinish: opts.onAtomicFinish
+    }
     this.pending = []
   }
 
   getConnection () {
-    if (this._activeConnections === this._maxConcurrency) {
+    const baton = {}
+    this.metrics.onConnectionRequest(baton)
+    if (this.activeConnections === this.maxConcurrency) {
       // not using Promise.defer() here in case it gets deprecated by
       // bluebird.
       const pending = _defer()
@@ -80,17 +109,21 @@ class Session {
     }
 
     const connPair = Promise.resolve(this._getConnection())
-    ++this._activeConnections
+    ++this.activeConnections
 
-    return connPair.then(
-      pair => new SessionConnectionPair(pair, this)
-    )
+    return connPair.then(pair => {
+      this.metrics.onConnectionStart(baton)
+      return new SessionConnectionPair(pair, this, baton)
+    })
   }
 
   transaction (operation, args) {
+    const baton = {}
     const getConnPair = this.getConnection()
-    const getResult = Session$RunWrapped(connPair => {
-      return new TransactionSession(connPair)
+    this.metrics.onTransactionRequest(baton, operation, args)
+    const getResult = Session$RunWrapped(this, connPair => {
+      this.metrics.onTransactionStart(baton, operation, args)
+      return new TransactionSession(connPair, this.metrics)
     }, getConnPair, `BEGIN`, {
       success: `COMMIT`,
       failure: `ROLLBACK`
@@ -98,6 +131,7 @@ class Session {
 
     const releasePair = getConnPair.then(pair => {
       return getResult.reflect().then(result => {
+        this.metrics.onTransactionFinish(baton, operation, args, result)
         return result.isFulfilled()
           ? pair.release()
           : pair.release(result.reason())
@@ -114,16 +148,17 @@ class Session {
   }
 
   releasePair (pair, err) {
-    --this._activeConnections
+    --this.activeConnections
     pair.release(err)
   }
 }
 
 class TransactionSession {
-  constructor (connPair) {
+  constructor (connPair, metrics) {
     this.connectionPair = connPair
     this.inactive = false
     this.operation = Promise.resolve(true)
+    this.metrics = metrics
   }
 
   getConnection () {
@@ -148,10 +183,13 @@ class TransactionSession {
   }
 
   atomic (operation, args) {
+    const baton = {}
     const atomicConnPair = this.getConnection()
     const savepointName = getSavepointName(operation)
-    const getResult = Session$RunWrapped(connPair => {
-      return new AtomicSession(connPair, savepointName)
+    this.metrics.onAtomicRequest(baton, operation, args)
+    const getResult = Session$RunWrapped(this, connPair => {
+      this.metrics.onAtomicStart(baton, operation, args)
+      return new AtomicSession(connPair, this.metrics, savepointName)
     }, atomicConnPair, `SAVEPOINT ${savepointName}`, {
       success: `RELEASE SAVEPOINT ${savepointName}`,
       failure: `ROLLBACK TO SAVEPOINT ${savepointName}`
@@ -159,6 +197,7 @@ class TransactionSession {
 
     const releasePair = atomicConnPair.then(pair => {
       return getResult.reflect().then(result => {
+        this.metrics.onAtomicFinish(baton, operation, args, result)
         return result.isFulfilled()
           ? pair.release()
           : pair.release(result.reason())
@@ -170,13 +209,14 @@ class TransactionSession {
 }
 
 class AtomicSession extends TransactionSession {
-  constructor (connection, name) {
-    super(connection)
+  constructor (connection, metrics, name) {
+    super(connection, metrics)
     this.name = name
   }
 }
 
-function Session$RunWrapped (createSession,
+function Session$RunWrapped (parent,
+                             createSession,
                              getConnPair,
                              before,
                              after,
