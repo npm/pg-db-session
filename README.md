@@ -101,12 +101,41 @@ function getConnection () {
 Request a connection pair. `release` should be called when the connection is no
 longer necessary.
 
-#### `db.atomic(Function → Promise<T>) → Function`
-
-Wrap a function as an atomic.
-
 #### `db.transaction(Function → Promise<T>) → Function`
 
 Wrap a function as requiring a transaction.
+
+```javascript
+const updateUser = db.atomic(function _updateUser(userId, name) {
+  const getPair = db.getConnection()
+  const queryDB = getPair.get('connection').then(conn => {
+    return Promise.promisify(conn.query, {context: conn})(
+      'UPDATE users SET name = $1 WHERE id = $2', [name, userId]
+    )
+  })
+  const releaseConn = queryDB.return(getPair.get('release'))
+    .then(release => release())
+  return releaseConn.return(queryDB)
+})
+
+// from inside an active session:
+updateUser(1313, 'gary').then(results => {
+
+})
+```
+
+#### `db.atomic(Function → Promise<T>) → Function`
+
+Wrap a function as an atomic. This groups all pending connection requests made by
+the function and all subsequent events the function calls together, such that they
+are resolved before any other pending requests. This is useful for operations that
+stretch multiple queries, for example if you had to:
+
+1. Fetch some data,
+2. then insert a row in one table,
+3. and then insert a row in another table,
+
+One might write that as an atomic function so that the three operations are grouped
+despite being spaced out temporally.
 
 [node-postgres]: https://github.com/brianc/node-postgres
