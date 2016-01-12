@@ -28,6 +28,9 @@ const api = module.exports = {
       onTransactionRequest: noop,
       onTransactionStart: noop,
       onTransactionFinish: noop,
+      onTransactionConnectionRequest: noop,
+      onTransactionConnectionStart: noop,
+      onTransactionConnectionFinish: noop,
       onAtomicRequest: noop,
       onAtomicStart: noop,
       onAtomicFinish: noop
@@ -90,6 +93,9 @@ class Session {
       onTransactionRequest: opts.onTransactionRequest,
       onTransactionStart: opts.onTransactionStart,
       onTransactionFinish: opts.onTransactionFinish,
+      onTransactionConnectionRequest: opts.onTransactionConnectionRequest,
+      onTransactionConnectionStart: opts.onTransactionConnectionStart,
+      onTransactionConnectionFinish: opts.onTransactionConnectionFinish,
       onAtomicRequest: opts.onAtomicRequest,
       onAtomicStart: opts.onAtomicStart,
       onAtomicFinish: opts.onAtomicFinish
@@ -167,10 +173,13 @@ class TransactionSession {
         reject(new NoSessionAvailable())
       })
     }
+
+    const baton = {}
+    this.metrics.onTransactionConnectionRequest(baton)
     // NB(chrisdickinson): creating a TxConnPair implicitly
     // swaps out "this.operation", creating a linked list of
     // promises.
-    return new TxSessionConnectionPair(this).onready
+    return new TxSessionConnectionPair(this, baton).onready
   }
 
   transaction (operation, args) {

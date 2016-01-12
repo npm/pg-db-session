@@ -81,6 +81,8 @@ Install a database `Session` on the domain `d`.
 
 Sessions accept the following options:
 
+<img align="right" src="https://cloud.githubusercontent.com/assets/37303/12259904/985ef78a-b8cd-11e5-8665-0535caa69334.png" alt="assets/event-flowchart.dot" />
+
 * `maxConcurrency`: An integer specifying the maximum number of connections a
   given session will make at a time. `0` is treated as `Infinity`. Defaults to
   `Infinity`. *Note:* this number is implicitly bound by the size of the `pg`
@@ -99,21 +101,29 @@ Sessions accept the following options:
   an optional `err` parameter that will be called when a connection is released
   back to the session.
 * `onTransactionRequest(baton, operation, args)`: A function accepting a baton,
-  function, and array of arguments representing the request for a transaction
+  function, and array of arguments, representing the request for a transaction
   session. Called coincident with `onConnectionRequest`.
 * `onTransactionStart(baton, operation, args)`: A function accepting a baton,
-  function, and array of arguments representing the fulfillment of a request
+  function, and array of arguments, representing the fulfillment of a request
   for a transaction session. Called before `BEGIN`, coincident with
   `onConnectionStart`.
 * `onTransactionFinish(baton, operation, args, PromiseInspection)`:
   A function accepting a baton, function, array of arguments, and a
   [`PromiseInspection`][bluebird-inspection] representing the state of the
   transaction. Called coincident with `onConnectionFinish`.
+* `onTransactionConnectionRequest(baton)`: A function accepting a baton,
+  representing the request for a connection within a transaction session.
+* `onTransactionConnectionStart(baton)`: A function accepting a baton,
+  representing the fulfillment of a request for a connection within a
+  transaction session.
+* `onTransactionConnectionFinish(baton, err)`: A function accepting a baton
+  and an optional `err` argument, representing the completion of a transaction
+  connection within a transaction session.
 * `onAtomicRequest(baton, operation, args)`: A function accepting a baton,
-  function, and array of arguments representing the request for an atomic
+  function, and array of arguments, representing the request for an atomic
   session.
 * `onAtomicStart(baton, operation, args)`: A function accepting a baton,
-  function, and array of arguments representing the fulfillment of a request
+  function, and array of arguments, representing the fulfillment of a request
   for an atomic session.
 * `onAtomicFinish(baton, operation, args, PromiseInspection)`:
   A function accepting a baton, function, array of arguments, and a

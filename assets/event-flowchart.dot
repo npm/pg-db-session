@@ -1,0 +1,28 @@
+digraph metrics {
+  A [label="(beginning state)"];
+  A                   -> onConnectionRequest;
+  onConnectionRequest -> onConnectionStart;
+  onConnectionStart   -> onConnectionFinish;
+  onConnectionFinish  -> onSessionIdle;
+  onConnectionFinish  -> onConnectionStart;
+  onSessionIdle       -> onConnectionRequest;
+
+  onConnectionRequest             -> onTransactionRequest;
+  onTransactionRequest            -> onConnectionStart;
+  onConnectionStart               -> onTransactionStart;
+  onTransactionStart        -> onTransactionFinish;
+  onTransactionFinish       -> onConnectionFinish;
+
+  onTransactionStart -> onTransactionConnectionRequest;
+  onTransactionConnectionRequest -> onTransactionConnectionStart;
+  onTransactionConnectionRequest -> onAtomicRequest;
+  onAtomicRequest -> onTransactionConnectionStart;
+  onTransactionConnectionStart -> onTransactionConnectionFinish;
+  onTransactionConnectionFinish -> onTransactionConnectionStart;
+  onTransactionConnectionFinish -> onTransactionFinish;
+
+  onTransactionConnectionStart -> onAtomicStart;
+  onAtomicFinish -> onTransactionConnectionFinish;
+  onAtomicStart -> onAtomicFinish;
+}
+
