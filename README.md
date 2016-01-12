@@ -43,3 +43,70 @@ const someAtomic = db.atomic(function atom () {
   // with savepoints.
 })
 ```
+
+Database sessions are active whenever their associated domain is active. This means
+that a domain can be associated with a request, and all requests for a connection
+will be managed by the session associated with that domain.
+
+Database sessions manage access to the lower-level postgres connection pool.
+This lets users specify maximum concurrency for a given session — for instance,
+retaining a pool of 20 connections, but only allotting a maximum of 4
+concurrent connections per incoming HTTP request.
+
+Sessions also manage *transaction* status — functions may be decorated with
+"transaction" or "atomic" wrappers, and the active session will automatically
+create a transactional sub-session for the execution of those functions and any
+subsequent events they spawn. Any requests for a connection will be handled by
+the subsession. The transaction held by the subsession will be committed or
+rolled back based on the fulfillment status of the promise returned by the
+wrapped function. Transactional sessions hold a single connection, releasing it
+to connection requests sequentially — this naturally reduces the connection
+concurrency to one.
+
+Atomics, like transactions, hold a single connection, delegating sequentially.
+They're useful for grouping a set of operations atomically within a
+transaction. Atomics are wrapped in a `SAVEPOINT` — releasing the savepoint if
+the promise returned by the wrapped function is fulfilled, and rolling back to
+it if the promise is rejected. Atomics may be nested.
+
+## API
+
+#### `db.install(d:Domain, getConnection:ConnPairFn, opts:Options)`
+
+Install a database `Session` on the domain `d`.
+
+#### `ConnPairFn := Function → Promise({connection, release})`
+
+A function that returns a `Promise` for an object with `connection` and `release`
+properties, corresponding to the `client` and `done` parameters handed back by
+[node-postgres][].
+
+Usually, this will look something like the following:
+
+```javascript
+function getConnection () {
+  return new Promise((resolve, reject) => {
+    pg.connect(CONNECTION_OPTIONS, (err, client, done) => {
+      err ? reject(err) : resolve({
+        connection: client,
+        release: done
+      })
+    })
+  })
+}
+```
+
+#### `db.getConnection() → Promise({connection, release})`
+
+Request a connection pair. `release` should be called when the connection is no
+longer necessary.
+
+#### `db.atomic(Function → Promise<T>) → Function`
+
+Wrap a function as an atomic.
+
+#### `db.transaction(Function → Promise<T>) → Function`
+
+Wrap a function as requiring a transaction.
+
+[node-postgres]: https://github.com/brianc/node-postgres
