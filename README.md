@@ -186,3 +186,4 @@ One might write that as an atomic function so that the three operations are grou
 despite being spaced out temporally.
 
 [node-postgres]: https://github.com/brianc/node-postgres
+[bluebird-inspection]: http://bluebirdjs.com/docs/api/promiseinspection.html
