@@ -215,6 +215,11 @@ class TransactionSession {
 
     return releasePair.return(getResult)
   }
+
+  // NB: for use in tests _only_!)
+  assign (domain) {
+    DOMAIN_TO_SESSION.set(domain, this)
+  }
 }
 
 class AtomicSession extends TransactionSession {
