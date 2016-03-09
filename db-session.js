@@ -21,6 +21,8 @@ const api = module.exports = {
   install (domain, getConnection, opts) {
     opts = Object.assign({
       maxConcurrency: Infinity,
+      onSubsessionStart: noop,
+      onSubsessionFinish: noop,
       onSessionIdle: noop,
       onConnectionRequest: noop,
       onConnectionStart: noop,
@@ -86,6 +88,8 @@ class Session {
     this.activeConnections = 0
     this.maxConcurrency = opts.maxConcurrency || Infinity
     this.metrics = {
+      onSubsessionStart: opts.onSubsessionStart,
+      onSubsessionFinish: opts.onSubsessionFinish,
       onSessionIdle: opts.onSessionIdle,
       onConnectionRequest: opts.onConnectionRequest,
       onConnectionStart: opts.onConnectionStart,
@@ -239,6 +243,7 @@ function Session$RunWrapped (parent,
   return getConnPair.then(pair => {
     const subdomain = domain.create()
     const session = createSession(pair)
+    parent.metrics.onSubsessionStart(parent, session)
     DOMAIN_TO_SESSION.set(subdomain, session)
 
     const runBefore = new Promise((resolve, reject) => {
@@ -273,7 +278,13 @@ function Session$RunWrapped (parent,
             err => err ? reject(err) : resolve()
           )
         })
-      })
+      }).then(
+        () => parent.metrics.onSubsessionFinish(parent, session),
+        err => {
+          parent.metrics.onSubsessionFinish(parent, session)
+          throw err
+        }
+      )
       return runCommitStep.return(getResult)
     })
   })

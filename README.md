@@ -129,6 +129,10 @@ Sessions accept the following options:
   A function accepting a baton, function, array of arguments, and a
   [`PromiseInspection`][bluebird-inspection] representing the state of the
   atomic transaction.
+* `onSubsessionStart(parentSession, childSession)`: Useful for copying
+  information down from parent sessions to child sessions.
+* `onSubsessionFinish(parentSession, childSession)`: Useful for cleaning up
+  information from child sessions.
 
 All functions will default to `noop` if not provided.
 
