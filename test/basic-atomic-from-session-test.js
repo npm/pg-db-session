@@ -29,8 +29,8 @@ test('test immediate atomic', assert => {
   }).then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
 BEGIN
-SAVEPOINT save_0_runOperation_TS
-RELEASE SAVEPOINT save_0_runOperation_TS
+SAVEPOINT save_0_bound_runOperation_TS
+RELEASE SAVEPOINT save_0_bound_runOperation_TS
 COMMIT
 release
 `.trim())
