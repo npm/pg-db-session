@@ -49,8 +49,8 @@ test('rolling back atomic calls ROLLBACK', assert => {
   .then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
 BEGIN
-SAVEPOINT save_0_anon_TS
-ROLLBACK TO SAVEPOINT save_0_anon_TS
+SAVEPOINT save_0_bound_TS
+ROLLBACK TO SAVEPOINT save_0_bound_TS
 ROLLBACK
 `.trim())
   })

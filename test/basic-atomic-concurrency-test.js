@@ -89,7 +89,7 @@ test('test nested atomic transaction order', assert => {
   }).then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
 BEGIN
-SAVEPOINT save_0_runSubOperation_TS
+SAVEPOINT save_0_bound_runSubOperation_TS
 load 0 0
 release 0 0
 load 0 1
@@ -98,10 +98,10 @@ load 0 2
 release 0 2
 load 0 3
 release 0 3
-RELEASE SAVEPOINT save_0_runSubOperation_TS
+RELEASE SAVEPOINT save_0_bound_runSubOperation_TS
 load 1
 release 1
-SAVEPOINT save_1_runSubOperation_TS
+SAVEPOINT save_1_bound_runSubOperation_TS
 load 2 0
 release 2 0
 load 2 1
@@ -110,7 +110,7 @@ load 2 2
 release 2 2
 load 2 3
 release 2 3
-RELEASE SAVEPOINT save_1_runSubOperation_TS
+RELEASE SAVEPOINT save_1_bound_runSubOperation_TS
 load 3
 release 3
 COMMIT

@@ -47,7 +47,7 @@ const api = module.exports = {
     return function atomic$operation () {
       return Promise.try(() => {
         const args = [].slice.call(arguments)
-        return api.session.atomic(operation, args)
+        return api.session.atomic(operation.bind(this), args)
       })
     }
   },
@@ -56,7 +56,7 @@ const api = module.exports = {
     return function transaction$operation () {
       return Promise.try(() => {
         const args = [].slice.call(arguments)
-        return api.session.transaction(operation, args)
+        return api.session.transaction(operation.bind(this), args)
       })
     }
   },
