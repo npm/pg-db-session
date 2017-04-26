@@ -9,6 +9,7 @@ const db = require('../db-session.js')
 const LOGS = []
 
 test('test root session concurrency=0', assert => {
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
@@ -42,12 +43,13 @@ release
 release 7
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => assert.end())
     .catch(assert.end)
 })
 
 test('test root session concurrency=1', assert => {
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 1})
   domain1.run(() => {
@@ -74,12 +76,13 @@ load 7
 release 7
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => assert.end())
     .catch(assert.end)
 })
 
 test('test root session concurrency=2', assert => {
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 2})
   domain1.run(() => {
@@ -107,12 +110,13 @@ release
 release 7
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => assert.end())
     .catch(assert.end)
 })
 
 test('test root session concurrency=4', assert => {
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 4})
   domain1.run(() => {
@@ -142,7 +146,7 @@ release
 release 7
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => assert.end())
     .catch(assert.end)
 })

@@ -39,12 +39,13 @@ const atomicRunSubOperation = db.atomic(runSubOperation)
 
 test('test nested transaction order', assert => {
   LOGS.length = 0
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
     return runOperations(txRunSubOperation)
   }).then(() => {
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => {
     assert.equal(LOGS.join('\n'), `
 BEGIN
@@ -71,7 +72,7 @@ release 2 3
 COMMIT
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   })
   .catch(err => assert.fail(err.stack))
   .finally(() => domain1.exit())
@@ -80,12 +81,13 @@ release
 
 test('test nested atomic transaction order', assert => {
   LOGS.length = 0
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
     return runOperations(atomicRunSubOperation)
   }).then(() => {
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
 BEGIN
@@ -116,7 +118,7 @@ release 3
 COMMIT
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   })
   .catch(err => assert.fail(err.stack))
   .finally(() => domain1.exit())

@@ -18,12 +18,13 @@ const runOperation = db.atomic(function runOperation (inner) {
 // having to explicitly start a transaction in-between.
 test('test immediate atomic', assert => {
   LOGS.length = 0
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
     return runOperation()
   }).then(() => {
-    assert.equal(process.domain, domain1)
+    assert.equal(process.domain, start)
     domain1.exit()
   }).then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
@@ -33,7 +34,7 @@ RELEASE SAVEPOINT save_0_runOperation_TS
 COMMIT
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => assert.end())
     .catch(assert.end)
 })

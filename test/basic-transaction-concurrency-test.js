@@ -24,12 +24,13 @@ test('test root session concurrency=0', assert => {
   // compare to ./basic-session-concurrency-test.js, concurrency=1 —
   // operations should load and release in sequence, and be bookended
   // by "BEGIN" / "END"
+  const start = process.domain
   const domain1 = domain.create()
   db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
     return runOperations()
   }).then(() => {
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
     domain1.exit()
   }).then(() => {
     assert.equal(LOGS.join('\n'), `
@@ -53,7 +54,7 @@ release 7
 COMMIT
 release
 `.trim())
-    assert.equal(process.domain, undefined)
+    assert.equal(process.domain, start)
   }).then(() => assert.end())
     .catch(assert.end)
 })

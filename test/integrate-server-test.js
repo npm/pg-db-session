@@ -14,6 +14,7 @@ function runOperation () {
 }
 
 test('test requests do not leak domains into requester', assert => {
+  process.domain.exit()
   const server = http.createServer((req, res) => {
     const domain1 = domain.create()
     db.install(domain1, getConnection, {maxConcurrency: 0})
