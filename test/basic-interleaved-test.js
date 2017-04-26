@@ -1,9 +1,9 @@
 'use strict'
 
-const domain = require('domain')
 const test = require('tap').test
 const fs = require('fs')
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 // this is pretty much just testing domains

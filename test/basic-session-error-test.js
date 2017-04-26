@@ -1,9 +1,9 @@
 'use strict'
 
 const Promise = require('bluebird')
-const domain = require('domain')
 const test = require('tap').test
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 const LOGS = []
@@ -15,7 +15,7 @@ test('cannot connect', assert => {
   const domain1 = domain.create()
   class TestError extends Error {}
 
-  db.install(domain1, () => new Promise((_, reject) => {
+  db.install(domain1, () => new Promise((resolve, reject) => {
     reject(new TestError('cannot connect'))
   }), {maxConcurrency: 0})
 

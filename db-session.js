@@ -2,10 +2,10 @@
 
 const DOMAIN_TO_SESSION = new WeakMap()
 const Promise = require('bluebird')
-const domain = require('domain')
 
 const TxSessionConnectionPair = require('./lib/tx-session-connpair.js')
 const SessionConnectionPair = require('./lib/session-connpair.js')
+const domain = require('./lib/domain')
 
 class NoSessionAvailable extends Error {
   constructor () {
@@ -173,7 +173,7 @@ class TransactionSession {
 
   getConnection () {
     if (this.inactive) {
-      return new Promise((_, reject) => {
+      return new Promise((resolve, reject) => {
         reject(new NoSessionAvailable())
       })
     }
@@ -188,7 +188,7 @@ class TransactionSession {
 
   transaction (operation, args) {
     if (this.inactive) {
-      return new Promise((_, reject) => {
+      return new Promise((resolve, reject) => {
         reject(new NoSessionAvailable())
       })
     }

@@ -1,13 +1,12 @@
 'use strict'
 
-const domain = require('domain')
 const test = require('tap').test
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 test('test transaction outside of session', assert => {
   const testTransaction = db.transaction(function testTransaction () {
-    return
   })
 
   testTransaction()
@@ -18,7 +17,6 @@ test('test transaction outside of session', assert => {
 
 test('test atomic outside of session', assert => {
   const testAtomic = db.atomic(function testAtomic () {
-    return
   })
 
   testAtomic()
@@ -42,7 +40,6 @@ test('test getConnection after release', assert => {
           .catch(err => assert.fail(err))
           .finally(assert.end)
       })
-      return
     })()
   })
   .catch(err => assert.fail(err))
@@ -74,7 +71,6 @@ test('test transaction after release', assert => {
           .catch(err => assert.fail(err))
           .finally(assert.end)
       })
-      return
     })()
   })
   .catch(err => assert.fail(err))

@@ -1,9 +1,9 @@
 'use strict'
 
 const Promise = require('bluebird')
-const domain = require('domain')
 const test = require('tap').test
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 // what happens if there's an error in the previous query?

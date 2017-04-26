@@ -27,7 +27,7 @@
   "homepage": "https://github.com/npm/pg-db-session#readme",
   "devDependencies": {
     "pg": "^4.4.3",
-    "standard": "^5.4.1",
+    "standard": "^10.0.2",
     "tap": "^9.0.0"
   },
   "dependencies": {

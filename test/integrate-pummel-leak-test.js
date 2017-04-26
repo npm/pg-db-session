@@ -2,14 +2,14 @@
 
 const childProcess = require('child_process')
 const Promise = require('bluebird')
-const domain = require('domain')
 const spawn = childProcess.spawn
 const pg = require('pg')
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 const TEST_DB_NAME = process.env.TEST_DB_NAME || 'pg_db_session_test'
-const IS_MAIN = !Boolean(process.env.TAP)
+const IS_MAIN = !process.env.TAP
 
 if (process.env.IS_CHILD) {
   runChild()
@@ -70,8 +70,10 @@ function runChild () {
   var count = 0
   var pending = 20
 
-  var resolve = null
-  const doRun = new Promise(_resolve => resolve = _resolve)
+  var done = null
+  const doRun = new Promise((resolve, reject) => {
+    done = resolve
+  })
 
   function iter () {
     if (count % 1000 === 0) {
@@ -80,7 +82,7 @@ function runChild () {
     if (++count < ITERATIONS) {
       return run().then(iter)
     }
-    return !--pending && resolve()
+    return !--pending && done()
   }
 
   for (var i = 0; i < 20; ++i) {

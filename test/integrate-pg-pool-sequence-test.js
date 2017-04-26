@@ -2,10 +2,10 @@
 
 const spawn = require('child_process').spawn
 const Promise = require('bluebird')
-const domain = require('domain')
 const test = require('tap').test
 const pg = require('pg')
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 const TEST_DB_NAME = process.env.TEST_DB_NAME || 'pg_db_session_test'

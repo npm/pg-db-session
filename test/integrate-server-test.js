@@ -1,9 +1,9 @@
 'use strict'
 
-const domain = require('domain')
 const test = require('tap').test
 const http = require('http')
 
+const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 function runOperation () {
@@ -62,4 +62,3 @@ test('test requests do not leak domains into requester', assert => {
     }
   }
 })
-
