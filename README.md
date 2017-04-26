@@ -1,7 +1,5 @@
 # pg-db-session
 
-[![build status](https://travis-ci.com/npm/pg-db-session.svg?token=yheHTHt7F3KqoBV9TUYc)](https://travis-ci.com/npm/pg-db-session)
-
 Abuse domains to get a form of continuation local storage. Associate all events
 originating from a single domain to a single database session, which manages
 maximum concurrency, transactions, and operation ordering for consumers of the
