@@ -69,7 +69,7 @@ function runChild () {
   const ITERATIONS = 70000
   var count = 0
   var pending = 20
-
+  const pool = new pg.Pool(`postgres://localhost/${TEST_DB_NAME}`)
   var done = null
   const doRun = new Promise((resolve, reject) => {
     done = resolve
@@ -90,7 +90,7 @@ function runChild () {
   }
 
   return doRun
-    .finally(() => pg.end())
+    .finally(() => pool.end())
 
   function run () {
     const domain1 = domain.create()
@@ -122,7 +122,7 @@ function runChild () {
 
   function getConnection () {
     return new Promise((resolve, reject) => {
-      pg.connect(`postgres://localhost/${TEST_DB_NAME}`, onconn)
+      pool.connect(onconn)
 
       function onconn (err, connection, release) {
         err ? reject(err) : resolve({connection, release})

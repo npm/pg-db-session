@@ -27,6 +27,7 @@ test('setup', assert => setup().then(assert.end))
 test('pg pooling does not adversely affect operation', assert => {
   const domain1 = domain.create()
   const domain2 = domain.create()
+  const pool = new pg.Pool(`postgres://localhost/${TEST_DB_NAME}`)
 
   db.install(domain1, getConnection, {maxConcurrency: 0})
   db.install(domain2, getConnection, {maxConcurrency: 0})
@@ -46,12 +47,12 @@ test('pg pooling does not adversely affect operation', assert => {
 
   return runTwo
     .catch(assert.fail)
-    .finally(() => pg.end())
+    .finally(() => pool.end())
     .finally(assert.end)
 
   function getConnection () {
     return new Promise((resolve, reject) => {
-      pg.connect(`postgres://localhost/${TEST_DB_NAME}`, onconn)
+      pool.connect(onconn)
 
       function onconn (err, connection, release) {
         err ? reject(err) : resolve({connection, release})
