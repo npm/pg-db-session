@@ -58,7 +58,6 @@ test('test error in BEGIN', assert => {
   const domain1 = domain.create()
   class BeginError extends Error {}
 
-
   domain1.run(() => {
     db.install(getConnection, {maxConcurrency: 0})
     return db.transaction(() => {
@@ -122,7 +121,6 @@ test('test error in COMMIT', assert => {
 test('test error in ROLLBACK: does not reuse connection', assert => {
   const domain1 = domain.create()
   class RollbackError extends Error {}
-
 
   var connectionPair = null
   domain1.run(() => {

@@ -126,7 +126,6 @@ test('test error in ROLLBACK: does not reuse connection', assert => {
   const domain1 = domain.create()
   class RollbackError extends Error {}
 
-
   var connectionPair = null
   domain1.run(() => {
     db.install(getConnection, {maxConcurrency: 1})

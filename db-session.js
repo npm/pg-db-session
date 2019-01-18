@@ -1,9 +1,9 @@
 'use strict'
 
-const CONTEXT_TO_SESSION = new WeakMap()
-
 const TxSessionConnectionPair = require('./lib/tx-session-connpair.js')
 const SessionConnectionPair = require('./lib/session-connpair.js')
+
+const sym = Symbol('context-to-session')
 
 class NoSessionAvailable extends Error {
   constructor () {
@@ -42,10 +42,10 @@ const api = module.exports = {
       onAtomicFinish: noop
     }, opts || {})
 
-    CONTEXT_TO_SESSION.set(getContext(), new Session(
+    getContext()[sym] = new Session(
       getConnection,
       opts
-    ))
+    )
   },
 
   atomic (operation) {
@@ -66,7 +66,7 @@ const api = module.exports = {
 
   get session () {
     const context = getContext()
-    var current = CONTEXT_TO_SESSION.get(context)
+    var current = context && context[sym]
     if (!current || current.inactive || !context) {
       throw new NoSessionAvailable()
     }
@@ -156,7 +156,7 @@ class Session {
 
   atomic (operation, args) {
     return this.transaction(() => {
-      return CONTEXT_TO_SESSION.get(getContext()).atomic(operation, args)
+      return getContext()[sym].atomic(operation, args)
     }, args.slice())
   }
 
@@ -211,7 +211,6 @@ class TransactionSession {
       failure: `ROLLBACK TO SAVEPOINT ${savepointName}`
     }, operation, args)
 
-
     const pair = await atomicConnPair
     try {
       const result = await getResult
@@ -229,7 +228,7 @@ class TransactionSession {
 
   // NB: for use in tests _only_!)
   assign (context) {
-    CONTEXT_TO_SESSION.set(context, this)
+    context[sym] = this
   }
 }
 
@@ -251,7 +250,7 @@ async function Session$RunWrapped (parent,
   const subcontext = getContext().nest()
   const session = createSession(pair)
   parent.metrics.onSubsessionStart(parent, session)
-  CONTEXT_TO_SESSION.set(subcontext, session)
+  subcontext[sym] = session
 
   await pair.connection.query(before)
   subcontext.claim()
@@ -265,17 +264,16 @@ async function Session$RunWrapped (parent,
   } finally {
     subcontext.end()
     session.inactive = true
-    CONTEXT_TO_SESSION.set(subcontext, null)
+    subcontext[sym] = null
     parent.metrics.onSubsessionFinish(parent, session)
   }
 }
 
 function getSavepointName (operation) {
   const id = getSavepointName.ID++
-  const dt = new Date().toISOString().replace(/[^\d]/g, '_').slice(0, -1)
   const name = (operation.name || 'anon').replace(/[^\w]/g, '_')
-  // e.g., "save_13_userToOrg_2016_01_03_08_30_00_000"
-  return `save_${id}_${name}_${dt}`
+  // e.g., "save_13_userToOrg_120101010"
+  return `save_${id}_${name}_${process.pid}`
 }
 getSavepointName.ID = 0
 

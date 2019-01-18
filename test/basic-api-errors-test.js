@@ -53,9 +53,10 @@ test('test getConnection after release', assert => {
 
   function getConnection () {
     return {
-      connection: {async query (sql) {
-        return
-      }},
+      connection: {
+        async query (sql) {
+        }
+      },
       release () {
       }
     }

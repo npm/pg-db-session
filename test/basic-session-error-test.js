@@ -16,7 +16,6 @@ test('cannot connect', assert => {
   const domain1 = domain.create()
   class TestError extends Error {}
 
-
   domain1.run(() => {
     db.install(() => new Promise((resolve, reject) => {
       reject(new TestError('cannot connect'))
