@@ -2,6 +2,7 @@
 
 const test = require('tap').test
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -11,12 +12,15 @@ test('rolling back transaction calls ROLLBACK', assert => {
   const domain1 = domain.create()
 
   LOGS.length = 0
-  db.install(domain1, getConnection, {maxConcurrency: 0})
 
   domain1.run(() => {
+    db.install(getConnection, {maxConcurrency: 0})
     return db.transaction(() => {
       throw new Error('no thanks')
-    })().reflect()
+    })().then(
+      xs => [null, xs],
+      xs => [xs, null]
+    )
   })
   .then(() => assert.equal(LOGS.join(' '), 'BEGIN ROLLBACK'))
   .catch(err => assert.fail(err))
@@ -25,10 +29,11 @@ test('rolling back transaction calls ROLLBACK', assert => {
 
   function getConnection () {
     return {
-      connection: {query (sql, ready) {
-        LOGS.push(sql)
-        return ready()
-      }},
+      connection: {
+        async query (sql) {
+          LOGS.push(sql)
+        }
+      },
       release () {
       }
     }
@@ -39,12 +44,15 @@ test('rolling back atomic calls ROLLBACK', assert => {
   const domain1 = domain.create()
 
   LOGS.length = 0
-  db.install(domain1, getConnection, {maxConcurrency: 0})
 
   domain1.run(() => {
+    db.install(getConnection, {maxConcurrency: 0})
     return db.atomic(() => {
       throw new Error('no thanks')
-    })().reflect()
+    })().then(
+      xs => [null, xs],
+      xs => [xs, null]
+    )
   })
   .then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
@@ -60,10 +68,11 @@ ROLLBACK
 
   function getConnection () {
     return {
-      connection: {query (sql, ready) {
-        LOGS.push(sql)
-        return ready()
-      }},
+      connection: {
+        async query (sql) {
+          LOGS.push(sql)
+        }
+      },
       release () {
       }
     }

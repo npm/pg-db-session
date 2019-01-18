@@ -2,6 +2,7 @@
 
 const test = require('tap').test
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 

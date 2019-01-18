@@ -28,7 +28,7 @@
   "devDependencies": {
     "pg": "^7.1.2",
     "standard": "^10.0.2",
-    "tap": "^10.3.2"
+    "tap": "^12.1.1"
   },
   "dependencies": {
     "bluebird": "^3.5.0"

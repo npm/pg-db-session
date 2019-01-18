@@ -1,11 +1,9 @@
 'use strict'
 
-const DOMAIN_TO_SESSION = new WeakMap()
-const Promise = require('bluebird')
+const CONTEXT_TO_SESSION = new WeakMap()
 
 const TxSessionConnectionPair = require('./lib/tx-session-connpair.js')
 const SessionConnectionPair = require('./lib/session-connpair.js')
-const domain = require('./lib/domain')
 
 class NoSessionAvailable extends Error {
   constructor () {
@@ -17,8 +15,14 @@ class NoSessionAvailable extends Error {
 function noop () {
 }
 
+let getContext = null
+
 const api = module.exports = {
-  install (domain, getConnection, opts) {
+  setup (_getContext) {
+    getContext = _getContext
+  },
+
+  install (getConnection, opts) {
     opts = Object.assign({
       maxConcurrency: Infinity,
       onSubsessionStart: noop,
@@ -37,27 +41,22 @@ const api = module.exports = {
       onAtomicStart: noop,
       onAtomicFinish: noop
     }, opts || {})
-    DOMAIN_TO_SESSION.set(domain, new Session(
+
+    CONTEXT_TO_SESSION.set(getContext(), new Session(
       getConnection,
       opts
     ))
   },
 
   atomic (operation) {
-    return function atomic$operation () {
-      return Promise.try(() => {
-        const args = [].slice.call(arguments)
-        return api.session.atomic(operation.bind(this), args)
-      })
+    return async function atomic$operation (...args) {
+      return api.session.atomic(operation.bind(this), args)
     }
   },
 
   transaction (operation) {
-    return function transaction$operation () {
-      return Promise.try(() => {
-        const args = [].slice.call(arguments)
-        return api.session.transaction(operation.bind(this), args)
-      })
+    return async function transaction$operation (...args) {
+      return api.session.transaction(operation.bind(this), args)
     }
   },
 
@@ -66,8 +65,9 @@ const api = module.exports = {
   },
 
   get session () {
-    var current = DOMAIN_TO_SESSION.get(process.domain)
-    if (!current || current.inactive || !process.domain) {
+    const context = getContext()
+    var current = CONTEXT_TO_SESSION.get(context)
+    if (!current || current.inactive || !context) {
       throw new NoSessionAvailable()
     }
     return current
@@ -127,7 +127,7 @@ class Session {
     })
   }
 
-  transaction (operation, args) {
+  async transaction (operation, args) {
     const baton = {}
     const getConnPair = this.getConnection()
     this.metrics.onTransactionRequest(baton, operation, args)
@@ -139,21 +139,24 @@ class Session {
       failure: `ROLLBACK`
     }, operation, args)
 
-    const releasePair = getConnPair.then(pair => {
-      return getResult.reflect().then(result => {
-        this.metrics.onTransactionFinish(baton, operation, args, result)
-        return result.isFulfilled()
-          ? pair.release()
-          : pair.release(result.reason())
-      })
-    })
+    const pair = await getConnPair
+    try {
+      const result = await getResult
+      pair.release()
 
-    return releasePair.return(getResult)
+      return result
+    } catch (err) {
+      pair.release(err)
+
+      throw err
+    } finally {
+      this.metrics.onTransactionFinish(baton, operation, args)
+    }
   }
 
   atomic (operation, args) {
     return this.transaction(() => {
-      return DOMAIN_TO_SESSION.get(process.domain).atomic(operation, args)
+      return CONTEXT_TO_SESSION.get(getContext()).atomic(operation, args)
     }, args.slice())
   }
 
@@ -195,7 +198,7 @@ class TransactionSession {
     return operation.apply(null, args)
   }
 
-  atomic (operation, args) {
+  async atomic (operation, args) {
     const baton = {}
     const atomicConnPair = this.getConnection()
     const savepointName = getSavepointName(operation)
@@ -208,21 +211,25 @@ class TransactionSession {
       failure: `ROLLBACK TO SAVEPOINT ${savepointName}`
     }, operation, args)
 
-    const releasePair = atomicConnPair.then(pair => {
-      return getResult.reflect().then(result => {
-        this.metrics.onAtomicFinish(baton, operation, args, result)
-        return result.isFulfilled()
-          ? pair.release()
-          : pair.release(result.reason())
-      })
-    })
 
-    return releasePair.return(getResult)
+    const pair = await atomicConnPair
+    try {
+      const result = await getResult
+      pair.release()
+
+      return result
+    } catch (err) {
+      pair.release(err)
+
+      throw err
+    } finally {
+      this.metrics.onAtomicFinish(baton, operation, args)
+    }
   }
 
   // NB: for use in tests _only_!)
-  assign (domain) {
-    DOMAIN_TO_SESSION.set(domain, this)
+  assign (context) {
+    CONTEXT_TO_SESSION.set(context, this)
   }
 }
 
@@ -233,61 +240,34 @@ class AtomicSession extends TransactionSession {
   }
 }
 
-function Session$RunWrapped (parent,
-                             createSession,
-                             getConnPair,
-                             before,
-                             after,
-                             operation,
-                             args) {
-  return getConnPair.then(pair => {
-    const subdomain = domain.create()
-    const session = createSession(pair)
-    parent.metrics.onSubsessionStart(parent, session)
-    DOMAIN_TO_SESSION.set(subdomain, session)
+async function Session$RunWrapped (parent,
+                                   createSession,
+                                   getConnPair,
+                                   before,
+                                   after,
+                                   operation,
+                                   args) {
+  const pair = await getConnPair
+  const subcontext = getContext().nest()
+  const session = createSession(pair)
+  parent.metrics.onSubsessionStart(parent, session)
+  CONTEXT_TO_SESSION.set(subcontext, session)
 
-    const runBefore = new Promise((resolve, reject) => {
-      return pair.connection.query(
-        before,
-        err => err ? reject(err) : resolve()
-      )
-    })
-
-    return runBefore.then(() => {
-      const getResult = Promise.resolve(
-        subdomain.run(() => Promise.try(() => {
-          return operation.apply(null, args)
-        }))
-      )
-
-      const reflectedResult = getResult.reflect()
-
-      const waitOperation = Promise.join(
-        reflectedResult,
-        reflectedResult.then(() => session.operation)
-      )
-      .finally(markInactive(subdomain))
-      .return(reflectedResult)
-
-      const runCommitStep = waitOperation.then(result => {
-        return new Promise((resolve, reject) => {
-          return pair.connection.query(
-            result.isFulfilled()
-              ? after.success
-              : after.failure,
-            err => err ? reject(err) : resolve()
-          )
-        })
-      }).then(
-        () => parent.metrics.onSubsessionFinish(parent, session),
-        err => {
-          parent.metrics.onSubsessionFinish(parent, session)
-          throw err
-        }
-      )
-      return runCommitStep.return(getResult)
-    })
-  })
+  await pair.connection.query(before)
+  subcontext.claim()
+  try {
+    var result = await operation(...args)
+    await pair.connection.query(after.success)
+    return result
+  } catch (err) {
+    await pair.connection.query(after.failure)
+    throw err
+  } finally {
+    subcontext.end()
+    session.inactive = true
+    CONTEXT_TO_SESSION.set(subcontext, null)
+    parent.metrics.onSubsessionFinish(parent, session)
+  }
 }
 
 function getSavepointName (operation) {
@@ -298,14 +278,6 @@ function getSavepointName (operation) {
   return `save_${id}_${name}_${dt}`
 }
 getSavepointName.ID = 0
-
-function markInactive (subdomain) {
-  return () => {
-    subdomain.exit()
-    DOMAIN_TO_SESSION.get(subdomain).inactive = true
-    DOMAIN_TO_SESSION.set(subdomain, null)
-  }
-}
 
 function _defer () {
   const pending = {

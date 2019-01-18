@@ -3,6 +3,7 @@
 const test = require('tap').test
 const http = require('http')
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -17,12 +18,12 @@ test('test requests do not leak domains into requester', assert => {
   process.domain.exit()
   const server = http.createServer((req, res) => {
     const domain1 = domain.create()
-    db.install(domain1, getConnection, {maxConcurrency: 0})
 
     domain1.add(req)
     domain1.add(res)
 
     const result = domain1.run(() => {
+      db.install(getConnection, {maxConcurrency: 0})
       return runOperation()
     })
 
@@ -31,7 +32,7 @@ test('test requests do not leak domains into requester', assert => {
       domain1.remove(res)
     })
 
-    return removed.return(result).then(data => {
+    return removed.then(() => result).then(data => {
       res.end(data)
     })
   })
@@ -55,9 +56,10 @@ test('test requests do not leak domains into requester', assert => {
 
   function getConnection () {
     return {
-      connection: {query (sql, ready) {
-        return ready()
-      }},
+      connection: {
+        async query (sql) {
+        }
+      },
       release () {
       }
     }

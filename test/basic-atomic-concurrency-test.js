@@ -3,6 +3,7 @@
 const Promise = require('bluebird')
 const test = require('tap').test
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -41,8 +42,8 @@ test('test nested transaction order', assert => {
   LOGS.length = 0
   const start = process.domain
   const domain1 = domain.create()
-  db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 0})
     return runOperations(txRunSubOperation)
   }).then(() => {
     assert.equal(process.domain, start)
@@ -83,8 +84,8 @@ test('test nested atomic transaction order', assert => {
   LOGS.length = 0
   const start = process.domain
   const domain1 = domain.create()
-  db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 0})
     return runOperations(atomicRunSubOperation)
   }).then(() => {
     assert.equal(process.domain, start)
@@ -127,10 +128,11 @@ release
 
 function innerGetConnection () {
   return {
-    connection: {query (sql, ready) {
-      LOGS.push(sql)
-      return ready()
-    }},
+    connection: {
+      async query (sql) {
+        LOGS.push(sql)
+      }
+    },
     release () {
       LOGS.push(`release`)
     }
