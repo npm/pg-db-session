@@ -3,6 +3,7 @@
 const Promise = require('bluebird')
 const test = require('tap').test
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -11,8 +12,8 @@ const LOGS = []
 test('test root session concurrency=0', assert => {
   const start = process.domain
   const domain1 = domain.create()
-  db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 0})
     return runOperations()
   }).then(() => {
     domain1.exit()
@@ -51,8 +52,8 @@ release
 test('test root session concurrency=1', assert => {
   const start = process.domain
   const domain1 = domain.create()
-  db.install(domain1, innerGetConnection, {maxConcurrency: 1})
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 1})
     return runOperations()
   }).then(() => {
     domain1.exit()
@@ -84,8 +85,8 @@ release
 test('test root session concurrency=2', assert => {
   const start = process.domain
   const domain1 = domain.create()
-  db.install(domain1, innerGetConnection, {maxConcurrency: 2})
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 2})
     return runOperations()
   }).then(() => {
     domain1.exit()
@@ -118,8 +119,8 @@ release
 test('test root session concurrency=4', assert => {
   const start = process.domain
   const domain1 = domain.create()
-  db.install(domain1, innerGetConnection, {maxConcurrency: 4})
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 4})
     return runOperations()
   }).then(() => {
     domain1.exit()
@@ -153,8 +154,10 @@ release
 
 function innerGetConnection () {
   return {
-    connection: {query () {
-    }},
+    connection: {
+      async query () {
+      }
+    },
     release () {
       LOGS.push(`release`)
     }

@@ -5,6 +5,7 @@ const Promise = require('bluebird')
 const test = require('tap').test
 const pg = require('pg')
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -27,31 +28,35 @@ test('setup', assert => setup().then(assert.end))
 test('pg pooling does not adversely affect operation', assert => {
   const domain1 = domain.create()
   const domain2 = domain.create()
+  const pool = new pg.Pool(`postgres://localhost/${TEST_DB_NAME}`)
 
-  db.install(domain1, getConnection, {maxConcurrency: 0})
-  db.install(domain2, getConnection, {maxConcurrency: 0})
-
-  const runOne = domain1.run(() => runOperation(domain1))
-    .then(() => {
-      domain1.exit()
-      assert.ok(!process.domain)
-    })
+  const d = process.domain
+  const runOne = domain1.run(() => {
+    db.install(getConnection, {maxConcurrency: 0})
+    return runOperation(domain1)
+  }).then(() => {
+    domain1.exit()
+    assert.equal(process.domain, d)
+  })
 
   const runTwo = runOne.then(() => {
-    return domain2.run(() => runOperation(domain2))
+    return domain2.run(() => {
+      db.install(getConnection, {maxConcurrency: 0})
+      return runOperation(domain2)
+    })
   }).then(() => {
     domain2.exit()
-    assert.ok(!process.domain)
+    assert.equal(process.domain, d)
   })
 
   return runTwo
     .catch(assert.fail)
-    .finally(() => pg.end())
+    .finally(() => pool.end())
     .finally(assert.end)
 
   function getConnection () {
     return new Promise((resolve, reject) => {
-      pg.connect(`postgres://localhost/${TEST_DB_NAME}`, onconn)
+      pool.connect(onconn)
 
       function onconn (err, connection, release) {
         err ? reject(err) : resolve({connection, release})
@@ -63,7 +68,7 @@ test('pg pooling does not adversely affect operation', assert => {
     assert.equal(process.domain, expectDomain)
     const getConnPair = db.getConnection()
 
-    const runSQL = getConnPair.get('connection').then(conn => {
+    const runSQL = getConnPair.then(xs => xs.connection).then(conn => {
       assert.equal(process.domain, expectDomain)
       return new Promise((resolve, reject) => {
         assert.equal(process.domain, expectDomain)
@@ -74,11 +79,11 @@ test('pg pooling does not adversely affect operation', assert => {
       })
     })
 
-    const runRelease = runSQL.return(getConnPair).then(
+    const runRelease = runSQL.then(() => getConnPair).then(
       pair => pair.release()
     )
 
-    return runRelease.return(runSQL)
+    return runRelease.then(() => runSQL)
   }
 })
 

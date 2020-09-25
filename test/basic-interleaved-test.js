@@ -3,6 +3,7 @@
 const test = require('tap').test
 const fs = require('fs')
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -11,8 +12,8 @@ test('test of interleaved requests', assert => {
   const domain1 = domain.create()
   const domain2 = domain.create()
 
-  db.install(domain1, getFakeConnection)
-  db.install(domain2, getFakeConnection)
+  domain1.run(() => db.install(domain1, getFakeConnection))
+  domain2.run(() => db.install(domain2, getFakeConnection))
 
   var pending = 3
 

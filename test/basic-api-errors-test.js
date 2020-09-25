@@ -2,6 +2,7 @@
 
 const test = require('tap').test
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -19,16 +20,20 @@ test('test atomic outside of session', assert => {
   const testAtomic = db.atomic(function testAtomic () {
   })
 
-  testAtomic()
+  return testAtomic()
     .then(() => { throw new Error('expected error') })
-    .catch(db.NoSessionAvailable, () => assert.end())
-    .catch(err => assert.end(err))
+    .catch(err => {
+      assert.type(err, db.NoSessionAvailable)
+    })
 })
 
 test('test getConnection after release', assert => {
   const domain1 = domain.create()
 
-  db.install(domain1, getConnection, {maxConcurrency: 0})
+  db.setup(() => process.domain)
+  domain1.run(() => {
+    db.install(getConnection, {maxConcurrency: 0})
+  })
 
   domain1.run(() => {
     return db.transaction(() => {
@@ -36,8 +41,9 @@ test('test getConnection after release', assert => {
       setImmediate(() => {
         session.getConnection()
           .then(pair => { throw new Error('should not reach here') })
-          .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
-          .catch(err => assert.fail(err))
+          .catch(err => {
+            assert.type(err, db.NoSessionAvailable)
+          })
           .finally(assert.end)
       })
     })()
@@ -47,9 +53,10 @@ test('test getConnection after release', assert => {
 
   function getConnection () {
     return {
-      connection: {query (sql, ready) {
-        return ready()
-      }},
+      connection: {
+        async query (sql) {
+        }
+      },
       release () {
       }
     }
@@ -59,7 +66,9 @@ test('test getConnection after release', assert => {
 test('test transaction after release', assert => {
   const domain1 = domain.create()
 
-  db.install(domain1, getConnection, {maxConcurrency: 0})
+  domain1.run(() => {
+    db.install(getConnection, {maxConcurrency: 0})
+  })
 
   domain1.run(() => {
     return db.transaction(() => {
@@ -67,8 +76,9 @@ test('test transaction after release', assert => {
       setImmediate(() => {
         session.transaction(() => {})
           .then(pair => { throw new Error('should not reach here') })
-          .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
-          .catch(err => assert.fail(err))
+          .catch(err => {
+            assert.type(err, db.NoSessionAvailable)
+          })
           .finally(assert.end)
       })
     })()
@@ -78,9 +88,10 @@ test('test transaction after release', assert => {
 
   function getConnection () {
     return {
-      connection: {query (sql, ready) {
-        return ready()
-      }},
+      connection: {
+        async query (sql) {
+        }
+      },
       release () {
       }
     }

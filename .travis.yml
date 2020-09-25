@@ -3,8 +3,7 @@ language: node_js
 env:
   - TAP_TIMEOUT=60
 node_js:
-  - "5.*"
-  - "4.2.*"
+  - "10"
 addons:
   postgresql: "9.4"
 services:

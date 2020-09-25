@@ -3,6 +3,7 @@
 const Promise = require('bluebird')
 const test = require('tap').test
 
+require('./setup')
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
@@ -15,11 +16,11 @@ test('cannot connect', assert => {
   const domain1 = domain.create()
   class TestError extends Error {}
 
-  db.install(domain1, () => new Promise((resolve, reject) => {
-    reject(new TestError('cannot connect'))
-  }), {maxConcurrency: 0})
-
   domain1.run(() => {
+    db.install(() => new Promise((resolve, reject) => {
+      reject(new TestError('cannot connect'))
+    }), {maxConcurrency: 0})
+
     return db.getConnection().then(pair => {
       pair.release()
     })
@@ -36,10 +37,10 @@ test('query error', assert => {
   LOGS.length = 0
   const domain1 = domain.create()
 
-  db.install(domain1, innerGetConnection, {maxConcurrency: 0})
   shouldErrorToggle = new Error('the kraken')
 
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 0})
     return db.getConnection().then(pair => {
       return new Promise((resolve, reject) => {
         pair.connection.query('FAKE QUERY', err => {
@@ -62,12 +63,12 @@ test('query error: pending connections', assert => {
   const domain1 = domain.create()
   class TestError extends Error {}
 
-  db.install(domain1, innerGetConnection, {maxConcurrency: 1})
   shouldErrorToggle = new TestError('the beast')
 
   var firstConnection = null
   var secondConnection = null
   domain1.run(() => {
+    db.install(innerGetConnection, {maxConcurrency: 1})
     return Promise.join(db.getConnection().then(pair => {
       firstConnection = pair
       return new Promise((resolve, reject) => {
@@ -75,7 +76,7 @@ test('query error: pending connections', assert => {
           err ? reject(err) : resolve()
         })
       }).then(pair.release, pair.release)
-    }).reflect(), db.getConnection().then(pair => {
+    }).then(xs => {}, xs => {}), db.getConnection().then(pair => {
       assert.ok(firstConnection)
       assert.notEqual(firstConnection, pair)
       secondConnection = pair
@@ -84,7 +85,7 @@ test('query error: pending connections', assert => {
           err ? reject(err) : resolve()
         })
       }).then(pair.release, pair.release)
-    }).reflect(), db.getConnection().then(pair => {
+    }).then(xs => {}, xs => {}), db.getConnection().then(pair => {
       assert.ok(secondConnection)
       assert.equal(secondConnection, pair)
       return new Promise((resolve, reject) => {
@@ -92,7 +93,7 @@ test('query error: pending connections', assert => {
           err ? reject(err) : resolve()
         })
       }).then(pair.release, pair.release)
-    }).reflect())
+    }).then(xs => {}, xs => {}))
   })
   .catch(err => assert.fail(err))
   .finally(() => domain1.exit())
