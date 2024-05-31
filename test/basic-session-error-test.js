@@ -25,11 +25,17 @@ test('cannot connect', assert => {
     })
   }).then(() => {
     throw new Error('expected an exception')
-  }).catch(TestError, () => assert.ok(1, 'saw exception')).then(() => {
-    domain1.exit()
+  }).catch(err => {
+    if(err instanceof TestError) {
+        assert.ok(1, 'saw exception')
+    } else {
+        throw err
+    }
+  }).then(() => {
+      domain1.exit()
   }).then(() => assert.end())
-    .catch(assert.end)
-})
+      .catch(assert.end)
+  })
 
 // what happens when there's an error querying?
 test('query error', assert => {
