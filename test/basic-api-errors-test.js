@@ -11,8 +11,13 @@ test('test transaction outside of session', assert => {
 
   testTransaction()
     .then(() => { throw new Error('expected error') })
-    .catch(db.NoSessionAvailable, () => assert.end())
-    .catch(err => assert.end(err))
+    .catch(err => {
+      if(err instanceof db.NoSessionAvailable) {
+          assert.end()
+      } else {
+          assert.end(err)
+      }
+    })
 })
 
 test('test atomic outside of session', assert => {
@@ -21,8 +26,13 @@ test('test atomic outside of session', assert => {
 
   testAtomic()
     .then(() => { throw new Error('expected error') })
-    .catch(db.NoSessionAvailable, () => assert.end())
-    .catch(err => assert.end(err))
+    .catch(err => {
+      if(err instanceof db.NoSessionAvailable) {
+          assert.end()
+      } else {
+          assert.end(err)
+      }
+    })
 })
 
 test('test getConnection after release', assert => {
@@ -36,8 +46,13 @@ test('test getConnection after release', assert => {
       setImmediate(() => {
         session.getConnection()
           .then(pair => { throw new Error('should not reach here') })
-          .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
-          .catch(err => assert.fail(err))
+          .catch(err => {
+            if(err instanceof db.NoSessionAvailable) {
+                assert.ok(1, 'caught err')
+            } else {
+                assert.fail(err)
+            }
+          })
           .finally(assert.end)
       })
     })()
@@ -67,8 +82,13 @@ test('test transaction after release', assert => {
       setImmediate(() => {
         session.transaction(() => {})
           .then(pair => { throw new Error('should not reach here') })
-          .catch(db.NoSessionAvailable, () => assert.ok(1, 'caught err'))
-          .catch(err => assert.fail(err))
+          .catch(err => {
+            if(err instanceof db.NoSessionAvailable) {
+                assert.ok(1, 'caught err')
+            } else {
+                assert.fail(err)
+            }
+          })
           .finally(assert.end)
       })
     })()
