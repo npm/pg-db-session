@@ -64,8 +64,12 @@ test('test error in BEGIN', assert => {
       assert.fail('should not reach here.')
     })()
   })
-  .catch(BeginError, () => assert.ok(1, 'caught expected err'))
-  .catch(err => assert.fail(err))
+  .catch(err => {
+    if(err instanceof BeginError) {
+        assert.ok(1, 'caught expected err')
+    }
+    assert.fail(err)
+  })
   .finally(() => domain1.exit())
   .finally(assert.end)
 
@@ -100,8 +104,12 @@ test('test error in COMMIT', assert => {
       return db.getConnection().then(pair => pair.release())
     })()
   })
-  .catch(CommitError, () => assert.ok(1, 'caught expected error'))
-  .catch(err => assert.fail(err))
+  .catch(err => {
+    if(err instanceof CommitError) {
+        assert.ok(1, 'caught expected error')
+    }
+    assert.fail(err)
+  })
   .finally(() => domain1.exit())
   .finally(assert.end)
 
