@@ -14,9 +14,8 @@ test('test transaction outside of session', assert => {
     .catch(err => {
       if(err instanceof db.NoSessionAvailable) {
           assert.end()
-      } else {
-          assert.end(err)
       }
+      assert.end(err)
     })
 })
 
@@ -29,9 +28,8 @@ test('test atomic outside of session', assert => {
     .catch(err => {
       if(err instanceof db.NoSessionAvailable) {
           assert.end()
-      } else {
-          assert.end(err)
       }
+      assert.end(err)
     })
 })
 
@@ -49,9 +47,8 @@ test('test getConnection after release', assert => {
           .catch(err => {
             if(err instanceof db.NoSessionAvailable) {
                 assert.ok(1, 'caught err')
-            } else {
-                assert.fail(err)
             }
+            assert.fail(err)
           })
           .finally(assert.end)
       })
@@ -85,9 +82,8 @@ test('test transaction after release', assert => {
           .catch(err => {
             if(err instanceof db.NoSessionAvailable) {
                 assert.ok(1, 'caught err')
-            } else {
-                assert.fail(err)
             }
+            assert.fail(err)
           })
           .finally(assert.end)
       })

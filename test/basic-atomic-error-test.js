@@ -67,9 +67,8 @@ test('test error in BEGIN', assert => {
   .catch(err => {
     if(err instanceof BeginError) {
         assert.ok(1, 'caught expected err')
-    } else {
-        assert.fail(err)
     }
+    assert.fail(err)
   })
   .finally(() => domain1.exit())
   .finally(assert.end)
@@ -108,9 +107,8 @@ test('test error in COMMIT', assert => {
   .catch(err => {
     if(err instanceof CommitError) {
         assert.ok(1, 'caught expected error')
-    } else {
-        assert.fail(err)
-    }
+    } 
+    assert.fail(err)
   })
   .finally(() => domain1.exit())
   .finally(assert.end)
