@@ -1,6 +1,6 @@
 'use strict'
 
-const Promise = require('bluebird')
+const { promisify } = require('util')
 const test = require('tap').test
 
 const domain = require('../lib/domain.js')
@@ -17,7 +17,7 @@ test('test error in previous query', assert => {
   domain1.run(() => {
     return db.transaction(() => {
       const first = db.getConnection().then(conn => {
-        return Promise.promisify(conn.connection.query)('ONE')
+        return promisify(conn.connection.query)('ONE')
           .then(() => conn.release())
           .catch(err => conn.release(err))
       })
@@ -25,7 +25,7 @@ test('test error in previous query', assert => {
       const second = first.then(() => {
         return db.getConnection()
       }).then(conn => {
-        return Promise.promisify(conn.connection.query)('TWO')
+        return promisify(conn.connection.query)('TWO')
           .then(() => conn.release())
           .catch(err => conn.release(err))
       })
@@ -151,7 +151,7 @@ test('test error in ROLLBACK: does not reuse connection', assert => {
       pair.release()
     })
 
-    return Promise.join(first, second)
+    return Promise.all([first, second])
   })
   .catch(err => assert.fail(err))
   .finally(() => domain1.exit())
