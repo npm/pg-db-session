@@ -1,12 +1,13 @@
 'use strict'
 
-const Promise = require('bluebird')
 const test = require('tap').test
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
 
 const LOGS = []
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 test('test root session concurrency=0', assert => {
   const start = process.domain
@@ -166,7 +167,7 @@ function runOperations () {
   return Promise.all(Array.from(Array(8)).map((_, idx) => {
     return db.getConnection().then(connPair => {
       LOGS.push(`load ${idx}`)
-      return Promise.delay(5).then(() => {
+      return delay(5).then(() => {
         LOGS.push(`release ${idx}`)
         connPair.release()
       })
