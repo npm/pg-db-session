@@ -1,7 +1,6 @@
 'use strict'
 
 const spawn = require('child_process').spawn
-const Promise = require('bluebird')
 const test = require('tap').test
 const pg = require('pg')
 
