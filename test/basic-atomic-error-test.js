@@ -1,6 +1,5 @@
 'use strict'
 
-const Promise = require('bluebird')
 const test = require('tap').test
 
 const domain = require('../lib/domain.js')
@@ -17,16 +16,24 @@ test('test error in previous query', assert => {
   domain1.run(() => {
     return db.atomic(() => {
       const first = db.getConnection().then(conn => {
-        return Promise.promisify(conn.connection.query)('ONE')
-          .then(() => conn.release())
+        return new Promise((resolve, reject) => {
+          conn.connection.query('ONE', err => {
+            if (err) return reject(err)
+            resolve()
+          })
+        }).then(() => conn.release())
           .catch(err => conn.release(err))
       })
 
       const second = first.then(() => {
         return db.getConnection()
       }).then(conn => {
-        return Promise.promisify(conn.connection.query)('TWO')
-          .then(() => conn.release())
+        return new Promise((resolve, reject) => {
+          conn.connection.query('TWO', err => {
+            if (err) return reject(err)
+            resolve()
+          })
+        }).then(() => conn.release())
           .catch(err => conn.release(err))
       })
 
@@ -141,7 +148,7 @@ test('test error in ROLLBACK: does not reuse connection', assert => {
         pair.release()
         throw new Error('any kind of error, really')
       })
-    })().reflect()
+    })().catch(() => {})
 
     const second = db.getConnection().then(pair => {
       // with concurrency=1, we will try to re-use
@@ -151,7 +158,7 @@ test('test error in ROLLBACK: does not reuse connection', assert => {
       pair.release()
     })
 
-    return Promise.join(first, second)
+    return Promise.all([first, second])
   })
   .catch(err => assert.fail(err))
   .finally(() => domain1.exit())
