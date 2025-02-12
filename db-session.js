@@ -140,15 +140,16 @@ class Session {
     }, operation, args)
 
     const releasePair = getConnPair.then(pair => {
-      return getResult.reflect().then(result => {
+      return getResult.then(result => {
         this.metrics.onTransactionFinish(baton, operation, args, result)
-        return result.isFulfilled()
-          ? pair.release()
-          : pair.release(result.reason())
+        return pair.release()
+      }).catch(reason => {
+        this.metrics.onTransactionFinish(baton, operation, args, reason)
+        return pair.release(reason)
       })
     })
 
-    return releasePair.return(getResult)
+    return releasePair.then(() => getResult)
   }
 
   atomic (operation, args) {
@@ -209,15 +210,16 @@ class TransactionSession {
     }, operation, args)
 
     const releasePair = atomicConnPair.then(pair => {
-      return getResult.reflect().then(result => {
+      return getResult.then(result => {
         this.metrics.onAtomicFinish(baton, operation, args, result)
-        return result.isFulfilled()
-          ? pair.release()
-          : pair.release(result.reason())
+        return pair.release()
+      }).catch(reason => {
+        this.metrics.onAtomicFinish(baton, operation, args, reason)
+        return pair.release(reason)
       })
     })
 
-    return releasePair.return(getResult)
+    return releasePair.then(() => getResult)
   }
 
   // NB: for use in tests _only_!)
@@ -233,59 +235,64 @@ class AtomicSession extends TransactionSession {
   }
 }
 
-function Session$RunWrapped (parent,
-                             createSession,
-                             getConnPair,
-                             before,
-                             after,
-                             operation,
-                             args) {
-  return getConnPair.then(pair => {
+function Session$RunWrapped(
+  parent,
+  createSession,
+  getConnPair,
+  before,
+  after,
+  operation,
+  args
+) {
+  return getConnPair.then((pair) => {
     const subdomain = domain.create()
     const session = createSession(pair)
     parent.metrics.onSubsessionStart(parent, session)
     DOMAIN_TO_SESSION.set(subdomain, session)
 
     const runBefore = new Promise((resolve, reject) => {
-      return pair.connection.query(
-        before,
-        err => err ? reject(err) : resolve()
+      return pair.connection.query(before, (err) =>
+        err ? reject(err) : resolve()
       )
     })
 
     return runBefore.then(() => {
       const getResult = Promise.resolve(
-        subdomain.run(() => Promise.try(() => {
-          return operation.apply(null, args)
-        }))
-      )
-
-      const reflectedResult = getResult.reflect()
-
-      const waitOperation = Promise.join(
-        reflectedResult,
-        reflectedResult.then(() => session.operation)
-      )
-      .finally(markInactive(subdomain))
-      .return(reflectedResult)
-
-      const runCommitStep = waitOperation.then(result => {
-        return new Promise((resolve, reject) => {
-          return pair.connection.query(
-            result.isFulfilled()
-              ? after.success
-              : after.failure,
-            err => err ? reject(err) : resolve()
-          )
+        subdomain.run(() => {
+          return Promise.resolve().then(() => {
+            return operation.apply(null, args)
+          })
         })
-      }).then(
-        () => parent.metrics.onSubsessionFinish(parent, session),
-        err => {
-          parent.metrics.onSubsessionFinish(parent, session)
-          throw err
-        }
       )
-      return runCommitStep.return(getResult)
+
+      const waitOperation = getResult
+        .then((result) => {
+          return Promise.all([
+            Promise.resolve(result),
+            Promise.resolve(session.operation),
+          ])
+        })
+        .finally(() => {
+          markInactive(subdomain)
+        })
+
+      const runCommitStep = waitOperation
+        .then(([result]) => {
+          return new Promise((resolve, reject) => {
+            return pair.connection.query(
+              result ? after.success : after.failure,
+              (err) => (err ? reject(err) : resolve())
+            )
+          })
+        })
+        .then(
+          () => parent.metrics.onSubsessionFinish(parent, session),
+          (err) => {
+            parent.metrics.onSubsessionFinish(parent, session)
+            throw err
+          }
+        )
+      return runCommitStep.then(() => getResult)
     })
   })
 }
