@@ -31,7 +31,9 @@ test('test requests do not leak domains into requester', assert => {
       domain1.remove(res)
     })
 
-    return removed.return(result).then(data => {
+    return removed.then(() => {
+      return result
+    }).then(data => {
       res.end(data)
     })
   })

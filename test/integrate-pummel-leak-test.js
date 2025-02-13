@@ -103,20 +103,21 @@ function runChild () {
 
   function runOperation () {
     const getConnPair = db.getConnection()
-
-    const runSQL = getConnPair.get('connection').then(conn => {
+  
+    return getConnPair.then(({ connection, release }) => {
       return new Promise((resolve, reject) => {
-        conn.query('SELECT 1', (err, data) => {
-          err ? reject(err) : resolve(data)
+        connection.query('SELECT 1', (err, data) => {
+          if (err) {
+            reject(err)
+          } else {
+            resolve({ data, release })
+          }
         })
       })
+    }).then(({ data, release }) => {
+      release()
+      return data
     })
-
-    const runRelease = runSQL.return(getConnPair).then(
-      pair => pair.release()
-    )
-
-    return runRelease.return(runSQL)
   }
 
   function getConnection () {

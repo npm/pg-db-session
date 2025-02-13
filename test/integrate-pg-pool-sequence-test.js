@@ -61,23 +61,26 @@ test('pg pooling does not adversely affect operation', assert => {
   function runOperation (expectDomain) {
     assert.equal(process.domain, expectDomain)
     const getConnPair = db.getConnection()
-
-    const runSQL = getConnPair.get('connection').then(conn => {
+  
+    const runSQL = getConnPair.then(({ connection, release }) => {
       assert.equal(process.domain, expectDomain)
       return new Promise((resolve, reject) => {
         assert.equal(process.domain, expectDomain)
-        conn.query('SELECT 1', (err, data) => {
+        connection.query('SELECT 1', (err, data) => {
           assert.equal(process.domain, expectDomain)
-          err ? reject(err) : resolve(data)
+          if (err) {
+            reject(err)
+          } else {
+            resolve({ data, release })
+          }
         })
       })
     })
-
-    const runRelease = runSQL.return(getConnPair).then(
-      pair => pair.release()
-    )
-
-    return runRelease.return(runSQL)
+  
+    return runSQL.then(({ data, release }) => {
+      release()
+      return data
+    })
   }
 })
 
