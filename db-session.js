@@ -45,19 +45,19 @@ const api = module.exports = {
 
   atomic (operation) {
     return function atomic$operation () {
-      return Promise.try(() => {
-        const args = [].slice.call(arguments)
-        return api.session.atomic(operation.bind(this), args)
-      })
+      const args = [].slice.call(arguments)
+      return (async () => {
+        return await api.session.atomic(operation.bind(this), args)
+      })()
     }
   },
 
   transaction (operation) {
     return function transaction$operation () {
-      return Promise.try(() => {
-        const args = [].slice.call(arguments)
-        return api.session.transaction(operation.bind(this), args)
-      })
+      const args = [].slice.call(arguments)
+      return (async () => {
+        return await api.session.transaction(operation.bind(this), args)
+      })()
     }
   },
 
