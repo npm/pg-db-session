@@ -1,7 +1,6 @@
 'use strict'
 
 const DOMAIN_TO_SESSION = new WeakMap()
-const Promise = require('bluebird')
 
 const TxSessionConnectionPair = require('./lib/tx-session-connpair.js')
 const SessionConnectionPair = require('./lib/session-connpair.js')
