@@ -29,8 +29,5 @@
     "pg": "6.1.6",
     "standard": "10.0.2",
     "tap": "10.3.2"
-  },
-  "dependencies": {
-    "bluebird": "3.5.0"
   }
 }
