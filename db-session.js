@@ -43,20 +43,16 @@ const api = module.exports = {
   },
 
   atomic (operation) {
-    return function atomic$operation () {
+    return async function atomic$operation () {
       const args = [].slice.call(arguments)
-      return (async () => {
-        return await api.session.atomic(operation.bind(this), args)
-      })()
+      return await api.session.atomic(operation.bind(this), args)
     }
   },
 
   transaction (operation) {
-    return function transaction$operation () {
+    return async function transaction$operation () {
       const args = [].slice.call(arguments)
-      return (async () => {
-        return await api.session.transaction(operation.bind(this), args)
-      })()
+      return await api.session.transaction(operation.bind(this), args)
     }
   },
 
