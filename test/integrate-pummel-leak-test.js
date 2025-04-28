@@ -3,6 +3,7 @@
 const childProcess = require('child_process')
 const spawn = childProcess.spawn
 const pg = require('pg')
+const { promisify } = require('util')
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
@@ -101,23 +102,15 @@ function runChild () {
     })
   }
 
-  function runOperation () {
-    const getConnPair = db.getConnection()
-  
-    return getConnPair.then(({ connection, release }) => {
-      return new Promise((resolve, reject) => {
-        connection.query('SELECT 1', (err, data) => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve({ data, release })
-          }
-        })
-      })
-    }).then(({ data, release }) => {
-      release()
+  async function runOperation () {
+    const { connection, release } = await db.getConnection()
+    try {
+      const query = promisify(connection.query).bind(connection)
+      const data = await query('SELECT 1')
       return data
-    })
+    } finally {
+      release()
+    }
   }
 
   function getConnection () {
