@@ -4,10 +4,10 @@ const test = require('tap').test
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
+const delay = require('../utils/delay')
 
 const LOGS = []
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const runOperations = db.transaction(function runOperations () {
   return Promise.all(Array.from(Array(8)).map((_, idx) => {
