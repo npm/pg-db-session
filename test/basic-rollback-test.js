@@ -16,10 +16,7 @@ test('rolling back transaction calls ROLLBACK', assert => {
   domain1.run(() => {
     return db.transaction(() => {
       throw new Error('no thanks')
-    })().then(
-      () => null,
-      () => null
-    )
+    })().catch(() => undefined)
   })
   .then(() => assert.equal(LOGS.join(' '), 'BEGIN ROLLBACK'))
   .catch(err => assert.fail(err))
@@ -47,10 +44,7 @@ test('rolling back atomic calls ROLLBACK', assert => {
   domain1.run(() => {
     return db.atomic(() => {
       throw new Error('no thanks')
-    })().then(
-      () => null,
-      () => null
-    )
+    })().catch(() => undefined)
   })
   .then(() => {
     assert.equal(LOGS.join('\n').replace(/_[\d_]+$/gm, '_TS'), `
