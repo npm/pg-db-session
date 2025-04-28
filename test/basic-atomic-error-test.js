@@ -1,6 +1,7 @@
 'use strict'
 
 const test = require('tap').test
+const { promisify } = require('utils')
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
@@ -16,25 +17,25 @@ test('test error in previous query', assert => {
   domain1.run(() => {
     return db.atomic(() => {
       const first = db.getConnection().then(conn => {
-        return new Promise((resolve, reject) => {
-          conn.connection.query('ONE', err => {
-            if (err) return reject(err)
-            resolve()
+        const queryAsync = promisify(conn.connection.query).bind(conn.connection)
+        return queryAsync('ONE')
+          .then(() => conn.release())
+          .catch(err => {
+            conn.release(err)
+            throw err
           })
-        }).then(() => conn.release())
-          .catch(err => conn.release(err))
       })
 
       const second = first.then(() => {
         return db.getConnection()
       }).then(conn => {
-        return new Promise((resolve, reject) => {
-          conn.connection.query('TWO', err => {
-            if (err) return reject(err)
-            resolve()
+        const queryAsync = promisify(conn.connection.query).bind(conn.connection)
+        return queryAsync('TWO')
+          .then(() => conn.release())
+          .catch(err => {
+            conn.release(err)
+            throw err
           })
-        }).then(() => conn.release())
-          .catch(err => conn.release(err))
       })
 
       return second.then(() => 'expect this value')
