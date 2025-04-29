@@ -149,7 +149,7 @@ test('test error in ROLLBACK: does not reuse connection', assert => {
         pair.release()
         throw new Error('any kind of error, really')
       })
-    })().catch(() => {})
+    })().catch(() => undefined)
 
     const second = db.getConnection().then(pair => {
       // with concurrency=1, we will try to re-use
