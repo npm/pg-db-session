@@ -1,10 +1,10 @@
 'use strict'
 
-const Promise = require('bluebird')
 const test = require('tap').test
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
+const delay = require('../utils/delay')
 
 const LOGS = []
 
@@ -12,7 +12,7 @@ const runOperations = db.transaction(function runOperations (inner) {
   return Promise.all(Array.from(Array(4)).map((_, idx) => {
     return idx % 2 === 0 ? inner(idx) : db.getConnection().then(connPair => {
       LOGS.push(`load ${idx}`)
-      return Promise.delay(5).then(() => {
+      return delay(5).then(() => {
         LOGS.push(`release ${idx}`)
         connPair.release()
       })
@@ -22,10 +22,10 @@ const runOperations = db.transaction(function runOperations (inner) {
 
 function runSubOperation (rootIdx) {
   return Promise.all(Array.from(Array(4)).map((_, idx) => {
-    return Promise.delay(5).then(() => {
+    return delay(5).then(() => {
       return db.getConnection().then(connPair => {
         LOGS.push(`load ${rootIdx} ${idx}`)
-        return Promise.delay(5).then(() => {
+        return delay(5).then(() => {
           LOGS.push(`release ${rootIdx} ${idx}`)
           connPair.release()
         })

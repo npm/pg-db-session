@@ -1,6 +1,5 @@
 'use strict'
 
-const Promise = require('bluebird')
 const test = require('tap').test
 
 const domain = require('../lib/domain.js')
@@ -74,31 +73,35 @@ test('query error: pending connections', assert => {
   var firstConnection = null
   var secondConnection = null
   domain1.run(() => {
-    return Promise.join(db.getConnection().then(pair => {
-      firstConnection = pair
-      return new Promise((resolve, reject) => {
-        pair.connection.query('FAKE QUERY', err => {
-          err ? reject(err) : resolve()
-        })
-      }).then(pair.release, pair.release)
-    }).reflect(), db.getConnection().then(pair => {
-      assert.ok(firstConnection)
-      assert.notEqual(firstConnection, pair)
-      secondConnection = pair
-      return new Promise((resolve, reject) => {
-        pair.connection.query('FAKE QUERY', err => {
-          err ? reject(err) : resolve()
-        })
-      }).then(pair.release, pair.release)
-    }).reflect(), db.getConnection().then(pair => {
-      assert.ok(secondConnection)
-      assert.equal(secondConnection, pair)
-      return new Promise((resolve, reject) => {
-        pair.connection.query('FAKE QUERY', err => {
-          err ? reject(err) : resolve()
-        })
-      }).then(pair.release, pair.release)
-    }).reflect())
+    return Promise.all([
+      db.getConnection().then(pair => {
+        firstConnection = pair
+        return new Promise((resolve, reject) => {
+          pair.connection.query('FAKE QUERY', err => {
+            err ? reject(err) : resolve()
+          })
+        }).then(pair.release, pair.release)
+      }),
+      db.getConnection().then(pair => {
+        assert.ok(firstConnection)
+        assert.notEqual(firstConnection, pair)
+        secondConnection = pair
+        return new Promise((resolve, reject) => {
+          pair.connection.query('FAKE QUERY', err => {
+            err ? reject(err) : resolve()
+          })
+        }).then(pair.release, pair.release)
+      }),
+      db.getConnection().then(pair => {
+        assert.ok(secondConnection)
+        assert.equal(secondConnection, pair)
+        return new Promise((resolve, reject) => {
+          pair.connection.query('FAKE QUERY', err => {
+            err ? reject(err) : resolve()
+          })
+        }).then(pair.release, pair.release)
+      })
+    ])
   })
   .catch(err => assert.fail(err))
   .finally(() => domain1.exit())

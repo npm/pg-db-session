@@ -1,9 +1,9 @@
 'use strict'
 
 const childProcess = require('child_process')
-const Promise = require('bluebird')
 const spawn = childProcess.spawn
 const pg = require('pg')
+const { promisify } = require('utils')
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
@@ -102,22 +102,12 @@ function runChild () {
     })
   }
 
-  function runOperation () {
-    const getConnPair = db.getConnection()
-
-    const runSQL = getConnPair.get('connection').then(conn => {
-      return new Promise((resolve, reject) => {
-        conn.query('SELECT 1', (err, data) => {
-          err ? reject(err) : resolve(data)
-        })
-      })
-    })
-
-    const runRelease = runSQL.return(getConnPair).then(
-      pair => pair.release()
-    )
-
-    return runRelease.return(runSQL)
+  async function runOperation () {
+    const { connection, release } = await db.getConnection()
+    const query = promisify(connection.query)
+    const data = await query('SELECT 1')
+    await release()
+    return data
   }
 
   function getConnection () {

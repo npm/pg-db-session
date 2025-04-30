@@ -1,18 +1,19 @@
 'use strict'
 
-const Promise = require('bluebird')
 const test = require('tap').test
 
 const domain = require('../lib/domain.js')
 const db = require('../db-session.js')
+const delay = require('../utils/delay')
 
 const LOGS = []
+
 
 const runOperations = db.transaction(function runOperations () {
   return Promise.all(Array.from(Array(8)).map((_, idx) => {
     return db.getConnection().then(connPair => {
       LOGS.push(`load ${idx}`)
-      return Promise.delay(5).then(() => {
+      return delay(5).then(() => {
         LOGS.push(`release ${idx}`)
         connPair.release()
       })
